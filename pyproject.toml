@@ -1,0 +1,15 @@
+[project]
+name = "GeoCloudService"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "IC2", email = "houlu8674@bupt.edu.cn"},
+]
+dependencies = []
+requires-python = "==3.11.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false

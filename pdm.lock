@@ -4,8 +4,11 @@
 [metadata]
 groups = ["default"]
 strategy = ["cross_platform", "inherit_metadata"]
-lock_version = "4.4.1"
-content_hash = "sha256:35cb41eb3428d82c3e74ae2b7766ec777f2b8670c779a3511de7f9ee71f24189"
+lock_version = "4.5.0"
+content_hash = "sha256:2f78208008ef3443ac4731616139d1ada71f41101495beba19f1504e0d63bc17"
+
+[[metadata.targets]]
+requires_python = "==3.11.*"
 
 [[package]]
 name = "blinker"
@@ -26,6 +29,7 @@ summary = "Composable command line interface toolkit"
 groups = ["default"]
 dependencies = [
     "colorama; platform_system == \"Windows\"",
+    "importlib-metadata; python_version < \"3.8\"",
 ]
 files = [
     {file = "click-8.1.7-py3-none-any.whl", hash = "sha256:ae74fb96c20a0277a1d615f1e4d73c8414f5a98db8b799a7931d1582f3390c28"},
@@ -45,6 +49,26 @@ files = [
 ]
 
 [[package]]
+name = "cx-oracle"
+version = "8.3.0"
+summary = "Python interface to Oracle"
+groups = ["default"]
+files = [
+    {file = "cx_Oracle-8.3.0.tar.gz", hash = "sha256:3b2d215af4441463c97ea469b9cc307460739f89fdfa8ea222ea3518f1a424d9"},
+]
+
+[[package]]
+name = "dbutils"
+version = "3.1.0"
+requires_python = ">3.7"
+summary = "Database connections for multi-threaded environments."
+groups = ["default"]
+files = [
+    {file = "DBUtils-3.1.0-py3-none-any.whl", hash = "sha256:4afca4c7f5b037cd44dd71933904c756e041a755841b1cf62431f1011ba29234"},
+    {file = "DBUtils-3.1.0.tar.gz", hash = "sha256:ea528ba11063240eea82345ebc6f7cc9324c06e42e9420b00bcd245a95bfcc24"},
+]
+
+[[package]]
 name = "flask"
 version = "3.0.3"
 requires_python = ">=3.8"
@@ -55,6 +79,7 @@ dependencies = [
     "Werkzeug>=3.0.0",
     "blinker>=1.6.2",
     "click>=8.1.3",
+    "importlib-metadata>=3.6.0; python_version < \"3.10\"",
     "itsdangerous>=2.1.2",
 ]
 files = [
@@ -116,6 +141,17 @@ groups = ["default"]
 files = [
     {file = "pika-1.3.2-py3-none-any.whl", hash = "sha256:0779a7c1fafd805672796085560d290213a465e4f6f76a6fb19e378d8041a14f"},
     {file = "pika-1.3.2.tar.gz", hash = "sha256:b2a327ddddf8570b4965b3576ac77091b850262d34ce8c1d8cb4e4146aa4145f"},
+]
+
+[[package]]
+name = "schedule"
+version = "1.2.2"
+requires_python = ">=3.7"
+summary = "Job scheduling for humans."
+groups = ["default"]
+files = [
+    {file = "schedule-1.2.2-py3-none-any.whl", hash = "sha256:5bef4a2a0183abf44046ae0d164cadcac21b1db011bdd8102e4a0c1e91e06a7d"},
+    {file = "schedule-1.2.2.tar.gz", hash = "sha256:15fe9c75fe5fd9b9627f3f19cc0ef1420508f9f9a46f45cd0769ef75ede5f0b7"},
 ]
 
 [[package]]

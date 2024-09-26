@@ -12,7 +12,7 @@ class Mapper:
         # pool = oracle.create_pool()
         conn = self.pool.connection()
         cursor = conn.cursor()
-        sql = "SELECT F_ID, F_ORDERNAME FROM (SELECT F_ID, F_ORDERNAME FROM TF_ORDER WHERE F_STATUS = -1 \
+        sql = "SELECT F_ID, F_ORDERNAME FROM (SELECT F_ID, F_ORDERNAME FROM TF_ORDER WHERE F_STATUS = 1 \
                 AND F_ORDERNAME IS NOT NULL ORDER BY F_ORDERNAME DESC) WHERE ROWNUM <= {}".format(count)
         cursor.execute(sql)
         result = cursor.fetchall()

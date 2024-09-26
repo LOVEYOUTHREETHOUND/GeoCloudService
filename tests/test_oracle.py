@@ -20,4 +20,4 @@ def test_dbconn():
     cursor.close()
     conn.close()
 
-test_dbconn()
+test_pool()

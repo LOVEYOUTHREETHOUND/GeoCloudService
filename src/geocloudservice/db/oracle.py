@@ -1,4 +1,5 @@
-import cx_Oracle
+# import cx_Oracle
+import oracledb
 import dbconfig
 from dbutils.pooled_db import PooledDB
 
@@ -10,7 +11,7 @@ def create_dbconn():
     port = db_config.get('port')
     database = db_config.get('database')
     str = username + '/' + password + '@' + host + ':' + port + '/' + database
-    conn = cx_Oracle.connect(str)
+    conn = oracledb.connect(str)
     return conn
 
 def create_pool():
@@ -20,6 +21,6 @@ def create_pool():
     host = db_config.get('host')
     port = db_config.get('port')
     database = db_config.get('database')
-    dsn = cx_Oracle.makedsn(host, port, database)
-    pool = PooledDB(cx_Oracle, user=username, password=password, dsn=dsn)
+    dsn = oracledb.makedsn(host, port, database)
+    pool = PooledDB(oracledb, user=username, password=password, dsn=dsn)
     return pool

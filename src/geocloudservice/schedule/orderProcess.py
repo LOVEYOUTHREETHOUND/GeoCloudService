@@ -3,7 +3,7 @@ import geocloudservice.db.oracle as oracle
 import os
 import json
 import Json_config
-import time
+# import time
 
 class OrderProcess:
     def __init__(self):
@@ -12,7 +12,7 @@ class OrderProcess:
 
     # 将未处理的订单名与订单数据名写入文件
     def writeOrderData(self):
-        start = time.time()
+        # start = time.time()
         idlist = self.mapper.getIdByStatus()
         config = Json_config.JsonConfig
         path = config.get("writepath")
@@ -24,12 +24,12 @@ class OrderProcess:
             }
             with open(path + '/' +'{}.json'.format(id[1]), 'w') as f:
                 f.write(json.dumps(orderdata, indent=4, ensure_ascii=False))
-        end = time.time()
-        print('writeOrderData cost time:', end - start)
+        # end = time.time()
+        # print('writeOrderData cost time:', end - start)
                 
     # 根据文件中的订单名和订单数据名更新订单状态
     def readOrderData(self):
-        start = time.time()
+        # start = time.time()
         config = Json_config.JsonConfig
         path = config.get("readpath")
         jsonlist = os.listdir(path)
@@ -43,8 +43,8 @@ class OrderProcess:
                 for item in orderdata:
                     self.mapper.updateStatusByNameAndId(item, id)
                 os.remove(path + '/' + jsonfile)
-        end = time.time()
-        print('readOrderData cost time:', end - start)
+        # end = time.time()
+        # print('readOrderData cost time:', end - start)
 
 
         

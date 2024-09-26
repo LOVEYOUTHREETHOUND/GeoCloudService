@@ -12,6 +12,7 @@ dependencies = [
     "cx-oracle>=8.3.0",
     "dbutils>=3.1.0",
     "schedule>=1.2.2",
+    "oracledb>=2.4.1",
 ]
 requires-python = "==3.11.*"
 readme = "README.md"

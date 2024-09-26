@@ -1,3 +1,4 @@
-import src.geocloudservice.schedule.orderProcess as orderProcess
+from src.geocloudservice.schedule.orderProcess import OrderProcess
 
-orderProcess.readOrderData()
+myOrderProcess = OrderProcess()
+myOrderProcess.readOrderData()

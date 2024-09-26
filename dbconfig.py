@@ -5,3 +5,11 @@ database = {
     'database' : 'ORCLCDB',
     'port' : '18881'
 }
+
+PoolDB = {
+    'mincached' : 2,
+    'maxcached' : 5,
+    'maxshared' : 3,
+    'maxconnections' : 6,
+    'blocking' : True
+}

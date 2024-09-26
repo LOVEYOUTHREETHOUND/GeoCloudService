@@ -25,7 +25,7 @@ class Mapper:
         # pool = oracle.create_pool()
         conn = self.pool.connection()
         cursor = conn.cursor()
-        sql = "SELECT F_DATANAME FROM TF_ORDERDATA WHERE F_ORDERID = {} AND F_STATUS = 0".format(f_orderid)
+        sql = "SELECT F_DATANAME FROM TF_ORDERDATA WHERE F_ORDERID = {} AND F_STATUS = 1".format(f_orderid)
         # print(sql)
         cursor.execute(sql)
         result = cursor.fetchall()
@@ -34,7 +34,7 @@ class Mapper:
         return result
 
     # 根据订单名在TF_ORDER中更新订单状态
-    def updateStatusByOrdername(self,f_ordername):
+    def updateOrderStatusByOrdername(self,f_ordername):
         # pool = oracle.create_pool()
         conn = self.pool.connection()
         cursor = conn.cursor()
@@ -45,11 +45,11 @@ class Mapper:
         conn.close()
 
     # 根据订阅数据名和订单ID在TF_ORDERDATA中更新订阅数据状态
-    def updateStatusByNameAndId(self,f_dataname, f_orderid):
+    def updateDataStatusByNameAndId(self,f_dataname, f_orderid):
         # pool = oracle.create_pool()
         conn = self.pool.connection()
         cursor = conn.cursor()
-        sql = "UPDATE TF_ORDERDATA SET F_STATUS = 1 WHERE F_DATANAME = '{}' AND F_ORDERID = '{}'".format(f_dataname, f_orderid)
+        sql = "UPDATE TF_ORDERDATA SET F_STATUS = 0 WHERE F_DATANAME = '{}' AND F_ORDERID = '{}'".format(f_dataname, f_orderid)
         # print(sql)
         cursor.execute(sql)
         conn.commit()

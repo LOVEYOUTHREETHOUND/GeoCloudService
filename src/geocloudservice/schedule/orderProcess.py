@@ -39,10 +39,10 @@ class OrderProcess:
                 name = data['order_name']
                 id = self.mapper.getIdByOrdername(name)
                 orderdata = data['order_data']
-                self.mapper.updateStatusByOrdername(name)
                 for item in orderdata:
-                    self.mapper.updateStatusByNameAndId(item, id)
+                    self.mapper.updateDataStatusByNameAndId(item, id)
                 os.remove(path + '/' + jsonfile)
+                self.mapper.updateOrderStatusByOrdername(name)
         # end = time.time()
         # print('readOrderData cost time:', end - start)
 

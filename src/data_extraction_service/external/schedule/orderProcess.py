@@ -1,21 +1,27 @@
-import geocloudservice.db.mapper as mapper
-import geocloudservice.db.oracle as oracle
+# import geocloudservice.db.mapper as mapper
+# import geocloudservice.db.oracle as oracle
+import utils.db.mapper as mapper
+import utils.db.oracle as oracle
 import os
 import json
-import Json_config
-# import time
+import config.Json_config as Json_config
+from concurrent.futures import ThreadPoolExecutor
+import time
 
 class OrderProcess:
     def __init__(self):
         self.pool = oracle.create_pool()
         self.mapper = mapper.Mapper(self.pool)
+        self.config = Json_config.JsonConfig
+        max_workers = self.config.get("max_workers")
+        self.executor = ThreadPoolExecutor(max_workers)
 
     # 将未处理的订单名与订单数据名写入文件
     def writeOrderData(self):
         # start = time.time()
         idlist = self.mapper.getIdByStatus()
-        config = Json_config.JsonConfig
-        path = config.get("writepath")
+        # config = Json_config.JsonConfig
+        path = self.config.get("writepath")
         for id in idlist:
             result = self.mapper.getDatanameByOrderId(id[0])
             orderdata = {
@@ -29,22 +35,41 @@ class OrderProcess:
                 
     # 根据文件中的订单名和订单数据名更新订单状态
     def readOrderData(self):
-        # start = time.time()
-        config = Json_config.JsonConfig
-        path = config.get("readpath")
-        jsonlist = os.listdir(path)
-        for jsonfile in jsonlist:
-            with open(path + '/' + jsonfile, 'r') as f:
-                data = json.load(f)
-                name = data['order_name']
-                id = self.mapper.getIdByOrdername(name)
-                orderdata = data['order_data']
-                for item in orderdata:
-                    self.mapper.updateDataStatusByNameAndId(item, id)
-                os.remove(path + '/' + jsonfile)
-                self.mapper.updateOrderStatusByOrdername(name)
-        # end = time.time()
-        # print('readOrderData cost time:', end - start)
+        start = time.time()
+        path = self.config.get("readpath")
+        filelist = os.listdir(path)
+        
+        def process_file(filename):
+            strlist = filename.split('__')
+            ordername = strlist[0]
+            orderdata = strlist[1]
+            id = self.mapper.getIdByOrdername(ordername)
+            self.mapper.updateDataStatusByNameAndId(orderdata, id)
+            os.remove(path + '/' + filename)
+            # print(self.mapper.getCountByOrderId(id))
+            if(self.mapper.getCountByOrderId(id) == 0):
+                self.mapper.updateOrderStatusByOrdername(ordername)
+            
+        self.executor.map(process_file, filelist)
+        
+        end = time.time()
+        print('readOrderData cost time:', end - start)
+    
+    # 此函数用于生成readOrderData函数的测试数据 
+    def justForTest(self):
+        idlist = self.mapper.getIdByStatus()
+        path = self.config.get("writepath")
+        for id in idlist:
+            result = self.mapper.getDatanameByOrderId(id[0])
+            for data in result:
+                file = open(path + '/' +'{}__{}'.format(id[1],data[0]), 'w')
+                file.close()
+
+        
+        
+        
+        
+        
 
 
         

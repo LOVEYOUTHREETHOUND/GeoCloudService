@@ -1,6 +1,6 @@
 import schedule
 
-from src.geocloudservice.schedule import orderProcess
+from src.data_extraction_service.external.schedule import orderProcess
 
 
 def main():

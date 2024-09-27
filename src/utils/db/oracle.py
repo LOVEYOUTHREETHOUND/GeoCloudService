@@ -1,6 +1,6 @@
 # import cx_Oracle
 import oracledb
-import dbconfig
+import config.dbconfig as dbconfig
 from dbutils.pooled_db import PooledDB
 
 def create_dbconn():

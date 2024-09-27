@@ -1,4 +1,5 @@
-import src.geocloudservice.db.mapper as mapper
+# import src.geocloudservice.db.mapper as mapper
+import utils.db.mapper as mapper
 
 def test_getIdByStatus():
     result = mapper.getIdByStatus()

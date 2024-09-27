@@ -1,4 +1,5 @@
-import src.geocloudservice.db.oracle as oracle
+# import src.geocloudservice.db.oracle as oracle
+import utils.db.oracle as oracle
 
 def test_pool():
     pool = oracle.create_pool()

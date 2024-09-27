@@ -1,5 +1,6 @@
-from geocloudservice.db import oracle
-import mapper_config 
+# from geocloudservice.db import oracle
+import utils.db.oracle as oracle
+import config.mapper_config as mapper_config 
 
 class Mapper:
     def __init__(self, pool):
@@ -62,6 +63,17 @@ class Mapper:
         conn = self.pool.connection()
         cursor = conn.cursor()
         sql = "SELECT F_ID FROM TF_ORDER WHERE F_ORDERNAME = '{}'".format(f_ordername)
+        cursor.execute(sql)
+        result = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return result[0][0]
+
+    # 根据订单ID获取未完成的订单数量
+    def getCountByOrderId(self,f_orderid):
+        conn = self.pool.connection()
+        cursor = conn.cursor()
+        sql = "SELECT COUNT(*) FROM TF_ORDERDATA WHERE F_ORDERID = {} AND F_STATUS = 1".format(f_orderid)
         cursor.execute(sql)
         result = cursor.fetchall()
         cursor.close()

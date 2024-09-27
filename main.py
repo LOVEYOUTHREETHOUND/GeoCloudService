@@ -15,7 +15,7 @@ match args.subparsers:
     case 'internal':
         commands.data_extraction_internal()
     case 'external':
-        print("External")
+        commands.data_extraction_external()
     case 'web':
         print("Web")
     case _:

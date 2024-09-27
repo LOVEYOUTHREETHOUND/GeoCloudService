@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:35cb41eb3428d82c3e74ae2b7766ec777f2b8670c779a3511de7f9ee71f24189"
+content_hash = "sha256:c7b1a2e6ab64f4f31601a6c689fd85fb8871e115809777eec30307f7ce4a5450"
 
 [[package]]
 name = "blinker"
@@ -116,6 +116,17 @@ groups = ["default"]
 files = [
     {file = "pika-1.3.2-py3-none-any.whl", hash = "sha256:0779a7c1fafd805672796085560d290213a465e4f6f76a6fb19e378d8041a14f"},
     {file = "pika-1.3.2.tar.gz", hash = "sha256:b2a327ddddf8570b4965b3576ac77091b850262d34ce8c1d8cb4e4146aa4145f"},
+]
+
+[[package]]
+name = "schedule"
+version = "1.2.2"
+requires_python = ">=3.7"
+summary = "Job scheduling for humans."
+groups = ["default"]
+files = [
+    {file = "schedule-1.2.2-py3-none-any.whl", hash = "sha256:5bef4a2a0183abf44046ae0d164cadcac21b1db011bdd8102e4a0c1e91e06a7d"},
+    {file = "schedule-1.2.2.tar.gz", hash = "sha256:15fe9c75fe5fd9b9627f3f19cc0ef1420508f9f9a46f45cd0769ef75ede5f0b7"},
 ]
 
 [[package]]

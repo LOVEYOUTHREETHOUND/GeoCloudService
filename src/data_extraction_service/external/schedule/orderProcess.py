@@ -18,11 +18,11 @@ class OrderProcess:
 
     # 将未处理的订单名与订单数据名写入文件
     def writeOrderData(self):
-        # start = time.time()
+        start = time.time()
         idlist = self.mapper.getIdByStatus()
-        # config = Json_config.JsonConfig
         path = self.config.get("writepath")
-        for id in idlist:
+        
+        def process_id(id):
             result = self.mapper.getDatanameByOrderId(id[0])
             orderdata = {
                 'order_name': id[1],
@@ -30,8 +30,11 @@ class OrderProcess:
             }
             with open(path + '/' +'{}.json'.format(id[1]), 'w') as f:
                 f.write(json.dumps(orderdata, indent=4, ensure_ascii=False))
-        # end = time.time()
-        # print('writeOrderData cost time:', end - start)
+                
+        self.executor.map(process_id, idlist)
+        end = time.time()
+        print('writeOrderData cost time:', end - start)
+
                 
     # 根据文件中的订单名和订单数据名更新订单状态
     def readOrderData(self):
@@ -42,11 +45,13 @@ class OrderProcess:
         def process_file(filename):
             strlist = filename.split('__')
             ordername = strlist[0]
+            # 数据名常以.tar.gz结尾，所以需要去掉后缀
+            if strlist[1].endswith(('tar.gz')):
+                strlist[1] = strlist[1][:-7]
             orderdata = strlist[1]
             id = self.mapper.getIdByOrdername(ordername)
             self.mapper.updateDataStatusByNameAndId(orderdata, id)
             os.remove(path + '/' + filename)
-            # print(self.mapper.getCountByOrderId(id))
             if(self.mapper.getCountByOrderId(id) == 0):
                 self.mapper.updateOrderStatusByOrdername(ordername)
             
@@ -62,7 +67,7 @@ class OrderProcess:
         for id in idlist:
             result = self.mapper.getDatanameByOrderId(id[0])
             for data in result:
-                file = open(path + '/' +'{}__{}'.format(id[1],data[0]), 'w')
+                file = open(path + '/' +'{}__{}.tar.gz'.format(id[1],data[0]), 'w')
                 file.close()
 
         

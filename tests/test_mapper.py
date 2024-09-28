@@ -1,5 +1,6 @@
 # import src.geocloudservice.db.mapper as mapper
 import utils.db.mapper as mapper
+import utils.db.oracle as oracle
 
 def test_getIdByStatus():
     result = mapper.getIdByStatus()
@@ -10,5 +11,10 @@ def test_getDatanameByOrderId():
     for id in idlist:
         result = mapper.getDatanameByOrderId(id[0])
         print(result)
+
+def test_getAllByOrderIdFromOrder(f_orderid):
+    Mymapper = mapper.Mapper(oracle.create_pool())
+    result = Mymapper.getAllByOrderIdFromOrder(f_orderid)
+    print(result)
     
-test_getDatanameByOrderId()
+test_getAllByOrderIdFromOrder(1838490410624552962)

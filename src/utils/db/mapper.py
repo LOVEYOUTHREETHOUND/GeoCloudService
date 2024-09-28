@@ -79,3 +79,33 @@ class Mapper:
         cursor.close()
         conn.close()
         return result[0][0]
+
+    # 根据订单ID从TF_ORDER中获取所有信息
+    def getAllByOrderIdFromOrder(self,f_orderid):
+        conn = self.pool.connection()
+        cursor = conn.cursor()
+        sql = "SELECT * FROM TF_ORDER WHERE F_ID = {}".format(f_orderid)
+        cursor.execute(sql)
+        columns = [col[0] for col in cursor.description]
+        result = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        data = [dict(zip(columns, row)) for row in result]
+        return data
+    
+    # 根据订单ID和数据名从TF_ORDERDATA中获取所有信息
+    def getAllByOrderIdFromOrderData(self,f_orderid,f_dataname):
+        conn = self.pool.connection()
+        cursor = conn.cursor()
+        sql = "SELECT * FROM TF_ORDERDATA \
+            WHERE F_ORDERID = {} AND F_DATANAME = '{}'".format(f_orderid,f_dataname)
+        # print(sql)
+        cursor.execute(sql)
+        columns = [col[0] for col in cursor.description]
+        result = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        data = [dict(zip(columns, row)) for row in result]
+        return data

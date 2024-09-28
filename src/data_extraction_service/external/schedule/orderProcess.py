@@ -1,5 +1,3 @@
-# import geocloudservice.db.mapper as mapper
-# import geocloudservice.db.oracle as oracle
 import utils.db.mapper as mapper
 import utils.db.oracle as oracle
 import os
@@ -7,6 +5,7 @@ import json
 import config.Json_config as Json_config
 from concurrent.futures import ThreadPoolExecutor
 import time
+from datetime import datetime
 
 class OrderProcess:
     def __init__(self):
@@ -17,24 +16,66 @@ class OrderProcess:
         self.executor = ThreadPoolExecutor(max_workers)
 
     # 将未处理的订单名与订单数据名写入文件
+    # def writeOrderData(self):
+    #     start = time.time()
+    #     idlist = self.mapper.getIdByStatus()
+    #     path = self.config.get("writepath")
+        
+    #     def process_id(id):
+    #         result = self.mapper.getDatanameByOrderId(id[0])
+    #         orderdata = {
+    #             'order_name': id[1],
+    #             'order_data': [item[0] for item in result]
+    #         }
+    #         with open(path + '/' +'{}.json'.format(id[1]), 'w') as f:
+    #             f.write(json.dumps(orderdata, indent=4, ensure_ascii=False))
+                
+    #     self.executor.map(process_id, idlist)
+    #     end = time.time()
+    #     print('writeOrderData cost time:', end - start)
+
     def writeOrderData(self):
         start = time.time()
         idlist = self.mapper.getIdByStatus()
-        path = self.config.get("writepath")
+        datapath = self.config.get("writeorderdatapath")
+        orderpath = self.config.get("writeorderpath")
         
-        def process_id(id):
-            result = self.mapper.getDatanameByOrderId(id[0])
-            orderdata = {
-                'order_name': id[1],
-                'order_data': [item[0] for item in result]
-            }
-            with open(path + '/' +'{}.json'.format(id[1]), 'w') as f:
-                f.write(json.dumps(orderdata, indent=4, ensure_ascii=False))
+        def convert_datetime_to_str(data):
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    if isinstance(value, datetime):
+                        data[key] = value.isoformat()
+                    elif isinstance(value, (dict, list)):
+                        convert_datetime_to_str(value)
+            elif isinstance(data, list):
+                for index, item in enumerate(data):
+                    if isinstance(item, datetime):
+                        data[index] = item.isoformat()
+                    elif isinstance(item, (dict, list)):
+                        convert_datetime_to_str(item)
+            return data
+        
+        def writeJsonFile(id):
+            orderresult = self.mapper.getAllByOrderIdFromOrder(id[0])[0]
+            # print (orderresult)
+            orderresult = convert_datetime_to_str(orderresult)
+            with open(orderpath + '/' +'{}.json'.format(id[1]), 'w') as f:
+                f.write(json.dumps(orderresult, indent=4, ensure_ascii=False))
                 
-        self.executor.map(process_id, idlist)
+            dataname = self.mapper.getDatanameByOrderId(id[0])
+            for data in dataname:
+                dataresult = self.mapper.getAllByOrderIdFromOrderData(id[0], data[0])[0]
+                dataresult = convert_datetime_to_str(dataresult)
+                with open(datapath + '/' +'{}__{}.json'.format(id[1],data[0]), 'w') as f:
+                    f.write(json.dumps(dataresult, indent=4, ensure_ascii=False))
+           
+        self.executor.map(writeJsonFile, idlist) 
         end = time.time()
         print('writeOrderData cost time:', end - start)
+    
 
+    
+            
                 
     # 根据文件中的订单名和订单数据名更新订单状态
     def readOrderData(self):

@@ -1,6 +1,7 @@
 # from geocloudservice.db import oracle
 import utils.db.oracle as oracle
 import config.mapper_config as mapper_config 
+import utils.logger as logger
 
 class Mapper:
     def __init__(self, pool):
@@ -123,24 +124,32 @@ class Mapper:
             
             sql1 = """
             INSERT INTO FTP_SUUSERS (
-                "StatisticsStartTime", "RtServerStartTime", "RtDailyCount", "LoginID", 
-                "PasswordChangedOn", "PasswordEncryptMode", "PasswordUTF8", "Password", 
-                "Type", "ExpiresOn", "HomeDir", "IncludeRespCodesInMsgFiles", 
-                "ODBCVersion", "Quota") 
-                VALUES (
+            "StatisticsStartTime", "RtServerStartTime", "RtDailyCount", "LoginID", 
+            "PasswordChangedOn", "PasswordEncryptMode", "PasswordUTF8", "Password", 
+            "Type", "ExpiresOn", "HomeDir", "IncludeRespCodesInMsgFiles", 
+            "ODBCVersion", "Quota"
+            ) 
+            SELECT 
                 :starttime, :starttime, :RtDailyCount, :ordername, 
                 :endtime, '1', '1', :pwd, 
                 '2', :endtime, 'Z:\\shareJGF\\order\\data\\' || :ordername, 
                 '1', '4', '0'
+            FROM FTP_SUUSERS
+            WHERE NOT EXISTS (
+                SELECT 1 FROM FTP_SUUSERS WHERE "LoginID" = :ordername
             )
             """
             # print("Executing SQL 1:", sql1)
             
             sql2 = """
             INSERT INTO FTP_USERDIRACCESS (
-                "LoginID", "SortIndex", "Dir", "Access"
-            ) VALUES (
+            "LoginID", "SortIndex", "Dir", "Access"
+            ) 
+            SELECT 
                 :ordername, 1, 'Z:\\shareJGF\\order\\data\\' || :ordername, '4383'
+            FROM FTP_USERDIRACCESS
+            WHERE NOT EXISTS (
+                SELECT 1 FROM FTP_USERDIRACCESS WHERE "LoginID" = :ordername
             )
             """
             # print("Executing SQL 2:", sql2)
@@ -152,17 +161,18 @@ class Mapper:
                 'endtime': endtime,
                 'pwd': pwd
             })
-            print("SQL 1 executed successfully")
+            # print("SQL 1 executed successfully")
             
             cursor.execute(sql2, {
                 'ordername': ordername
             })
-            print("SQL 2 executed successfully")
+            # print("SQL 2 executed successfully")
             
             conn.commit()
             print("Serv-U user created successfully")
         except Exception as e:
-            print("Error executing SQL:", e)
+            # print("Error executing SQL:", e)
+            logger.error("Serv-U用户创建错误: %s", e)
         finally:
             cursor.close()
             conn.close()

@@ -100,7 +100,6 @@ class OrderProcess:
             self.mapper.updateDataStatusByNameAndId(orderdata, id)
             os.remove(path + '/' + filename)
             if(self.mapper.getCountByOrderId(id) == 0):
-                print("111")
                 self.mapper.updateOrderStatusByOrdername(ordername)
                 self.createServUUser(ordername)
             

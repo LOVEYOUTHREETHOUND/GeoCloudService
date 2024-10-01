@@ -5,7 +5,10 @@ import json
 import config.Json_config as Json_config
 from concurrent.futures import ThreadPoolExecutor
 import time
-from datetime import datetime
+import string
+import random
+from datetime import datetime,timedelta
+import hashlib
 
 class OrderProcess:
     def __init__(self):
@@ -16,24 +19,6 @@ class OrderProcess:
         self.executor = ThreadPoolExecutor(max_workers)
 
     # 将未处理的订单名与订单数据名写入文件
-    # def writeOrderData(self):
-    #     start = time.time()
-    #     idlist = self.mapper.getIdByStatus()
-    #     path = self.config.get("writepath")
-        
-    #     def process_id(id):
-    #         result = self.mapper.getDatanameByOrderId(id[0])
-    #         orderdata = {
-    #             'order_name': id[1],
-    #             'order_data': [item[0] for item in result]
-    #         }
-    #         with open(path + '/' +'{}.json'.format(id[1]), 'w') as f:
-    #             f.write(json.dumps(orderdata, indent=4, ensure_ascii=False))
-                
-    #     self.executor.map(process_id, idlist)
-    #     end = time.time()
-    #     print('writeOrderData cost time:', end - start)
-
     def writeOrderData(self):
         start = time.time()
         idlist = self.mapper.getIdByStatus()
@@ -72,11 +57,32 @@ class OrderProcess:
         self.executor.map(writeJsonFile, idlist) 
         end = time.time()
         print('writeOrderData cost time:', end - start)
-    
 
-    
-            
+    # 创建Serv-U用户
+    def createServUUser(self,ordername):
+        starttime = int(datetime.now().timestamp())
+        endtime = datetime.now() + timedelta(days=14)
+        endtime = int(endtime.timestamp())
+        
+        def createPwd():
+            characters = string.ascii_letters + string.digits  # 包含大小写字母和数字
+            password = ''.join(random.choice(characters) for _ in range(8))
+            head = ''.join(random.choice(string.ascii_letters) for _ in range(2))
+            pwd = head + password
+            md5_obj = hashlib.md5()
+            md5_obj.update(pwd.encode('utf-8'))
+            pwd = head + md5_obj.hexdigest()
+            return password,pwd
+
+        pwd, md5 = createPwd()
+        # print("生成的随机密码:", pwd)
+        # print("生成的md5密码:", md5)
+        self.mapper.insertServUInfo(starttime, endtime, ordername, md5)
+        # print("Serv-U用户创建成功")
+        self.mapper.insertServUPwd(ordername, pwd)
+        # print("Serv-U密码创建成功")
                 
+    
     # 根据文件中的订单名和订单数据名更新订单状态
     def readOrderData(self):
         start = time.time()
@@ -94,7 +100,9 @@ class OrderProcess:
             self.mapper.updateDataStatusByNameAndId(orderdata, id)
             os.remove(path + '/' + filename)
             if(self.mapper.getCountByOrderId(id) == 0):
+                print("111")
                 self.mapper.updateOrderStatusByOrdername(ordername)
+                self.createServUUser(ordername)
             
         self.executor.map(process_file, filelist)
         
@@ -104,7 +112,7 @@ class OrderProcess:
     # 此函数用于生成readOrderData函数的测试数据 
     def justForTest(self):
         idlist = self.mapper.getIdByStatus()
-        path = self.config.get("writepath")
+        path = self.config.get("readpath")
         for id in idlist:
             result = self.mapper.getDatanameByOrderId(id[0])
             for data in result:

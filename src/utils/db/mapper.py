@@ -81,6 +81,7 @@ class Mapper:
         return result[0][0]
 
     # 根据订单ID从TF_ORDER中获取所有信息
+    # 返回格式为列名：数据
     def getAllByOrderIdFromOrder(self,f_orderid):
         conn = self.pool.connection()
         cursor = conn.cursor()
@@ -95,6 +96,7 @@ class Mapper:
         return data
     
     # 根据订单ID和数据名从TF_ORDERDATA中获取所有信息
+    # 返回格式为列名：数据
     def getAllByOrderIdFromOrderData(self,f_orderid,f_dataname):
         conn = self.pool.connection()
         cursor = conn.cursor()
@@ -109,3 +111,69 @@ class Mapper:
         
         data = [dict(zip(columns, row)) for row in result]
         return data
+
+    # 向数据库中插入数据以创建Serv-U用户
+    # 向FTP_SUUSERS表中插入数据以创建用户
+    # 向FTP_USERDIRACCESS表中插入数据以配置用户权限
+    def insertServUInfo(self, starttime, endtime, ordername, pwd):
+        RtDailyCount = "0,14,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+        try:
+            conn = self.pool.connection()
+            cursor = conn.cursor()
+            
+            sql1 = """
+            INSERT INTO FTP_SUUSERS (
+                "StatisticsStartTime", "RtServerStartTime", "RtDailyCount", "LoginID", 
+                "PasswordChangedOn", "PasswordEncryptMode", "PasswordUTF8", "Password", 
+                "Type", "ExpiresOn", "HomeDir", "IncludeRespCodesInMsgFiles", 
+                "ODBCVersion", "Quota") 
+                VALUES (
+                :starttime, :starttime, :RtDailyCount, :ordername, 
+                :endtime, '1', '1', :pwd, 
+                '2', :endtime, 'Z:\\shareJGF\\order\\data\\' || :ordername, 
+                '1', '4', '0'
+            )
+            """
+            # print("Executing SQL 1:", sql1)
+            
+            sql2 = """
+            INSERT INTO FTP_USERDIRACCESS (
+                "LoginID", "SortIndex", "Dir", "Access"
+            ) VALUES (
+                :ordername, 1, 'Z:\\shareJGF\\order\\data\\' || :ordername, '4383'
+            )
+            """
+            # print("Executing SQL 2:", sql2)
+            
+            cursor.execute(sql1, {
+                'starttime': starttime,
+                'RtDailyCount': RtDailyCount,
+                'ordername': ordername,
+                'endtime': endtime,
+                'pwd': pwd
+            })
+            print("SQL 1 executed successfully")
+            
+            cursor.execute(sql2, {
+                'ordername': ordername
+            })
+            print("SQL 2 executed successfully")
+            
+            conn.commit()
+            print("Serv-U user created successfully")
+        except Exception as e:
+            print("Error executing SQL:", e)
+        finally:
+            cursor.close()
+            conn.close()
+        
+    # 向TF_ORDER表中对应用户插入密码
+    def insertServUPwd(self, ordername, pwd):
+        conn = self.pool.connection()
+        cursor = conn.cursor()
+        
+        sql = "UPDATE TF_ORDER SET F_PASSWORD = '{}' WHERE F_ORDERNAME = '{}'".format(pwd, ordername)
+        cursor.execute(sql)
+        conn.commit()
+        cursor.close()
+        conn.close()

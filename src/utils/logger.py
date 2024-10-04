@@ -18,3 +18,11 @@ logger.addHandler(file_handler)
 
 logger.setLevel(logging.DEBUG)
 
+def info(message):
+    logger.info(message)
+
+def debug(message):
+    logger.debug(message)
+
+def error(message):
+    logger.error(message)

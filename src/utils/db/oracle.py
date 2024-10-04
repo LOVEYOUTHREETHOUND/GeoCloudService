@@ -35,3 +35,5 @@ def create_pool():
                     mincached=mincached, maxcached=maxcached, maxshared=maxshared, 
                     maxconnections=maxconnections, blocking=blocking)
     return pool
+
+Mypool = create_pool()

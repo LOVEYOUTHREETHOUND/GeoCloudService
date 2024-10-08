@@ -7,9 +7,9 @@ database = {
 }
 
 PoolDB = {
-    'mincached' : 2,
-    'maxcached' : 5,
-    'maxshared' : 3,
-    'maxconnections' : 6,
+    'mincached' : 5,
+    'maxcached' : 30,
+    'maxshared' : 30,
+    'maxconnections' : 50,
     'blocking' : True
 }

@@ -3,9 +3,9 @@ from data_extraction_service.external.schedule.orderProcess import OrderProcess
 import time
 
 myOrderProcess = OrderProcess()
-# myOrderProcess.writeOrderData()
-myOrderProcess.justForTest()
-myOrderProcess.readOrderData()
+myOrderProcess.writeOrderData()
+# myOrderProcess.justForTest()
+# myOrderProcess.readOrderData()
 
 # t2 = 1727230889
 # s_l = time.localtime(t2)

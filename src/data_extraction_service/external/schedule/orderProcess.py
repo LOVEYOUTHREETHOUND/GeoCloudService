@@ -66,26 +66,30 @@ class OrderProcess:
     def createServUUser(self,ordername):
         try:
             logger.debug("正在创建Serv-U用户 %s" % ordername)
+            # 当前时间为起始时间
             starttime = int(datetime.now().timestamp())
+            # 默认过期时间为两周
             endtime = datetime.now() + timedelta(days=14)
             endtime = int(endtime.timestamp())
             
+            # 返回值为原始密码和md5加密后的密码
+            # 加密规则为：nn+md5(nn+password)，其中nn为随机的两个字母
             def createPwd():
                 characters = string.ascii_letters + string.digits  # 包含大小写字母和数字
                 password = ''.join(random.choice(characters) for _ in range(8))
                 head = ''.join(random.choice(string.ascii_letters) for _ in range(2))
-                pwd = head + password
+                md5 = head + password
                 md5_obj = hashlib.md5()
-                md5_obj.update(pwd.encode('utf-8'))
-                pwd = head + md5_obj.hexdigest()
-                return password,pwd
+                md5_obj.update(md5.encode('utf-8'))
+                md5 = head + md5_obj.hexdigest()
+                return password,md5
 
             pwd, md5 = createPwd()
             self.mapper.insertServUInfo(starttime, endtime, ordername, md5)
             self.mapper.insertServUPwd(ordername, pwd, md5)
-            logger.debug("用户 %s 创建成功" % ordername)
+            logger.debug("Serv-U用户 %s 创建成功" % ordername)
         except Exception as e:
-            logger.error("用户创建失败: %s" % e)
+            logger.error("Serv-U用户{}创建失败:{}" .format(ordername, e))
                 
     
     # 根据文件中的订单名和订单数据名更新订单状态

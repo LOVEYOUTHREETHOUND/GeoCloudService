@@ -212,3 +212,113 @@ class Mapper:
         finally:
             cursor.close()
             conn.close()
+     
+    # 从TF_ORDER表中查询测试订单
+    def seleteTestOrder(self):
+        try:
+            conn = self.pool.connection()
+            cursor = conn.cursor()
+            sql = "SELECT * \
+                    FROM TF_ORDER \
+                    WHERE F_PRODUCT_NAME LIKE '%测试%' \
+                    OR F_PRODUCT_NAME LIKE '%test%' \
+                    OR F_PRODUCT_NAME LIKE '%Test%';"
+            cursor.execute(sql)
+            result = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return result
+        except Exception as e:
+            logger.error("查询测试订单错误: %s" % e)
+            return []
+
+    # 将文件信息插入TF_ORDERDATA表中
+    def insertOrderData(self,data):
+        try:
+            orderId = data.get("F_ID")
+            # logger.info("正在插入订单数据{}".format(orderId))
+            conn = self.pool.connection()
+            cursor = conn.cursor()
+            sql = """
+            MERGE INTO TF_ORDERDATA t
+            USING (SELECT :F_ID AS F_ID FROM dual) d
+            ON (t.F_ID = d.F_ID)
+            WHEN NOT MATCHED THEN
+            INSERT (
+                F_ID, F_ORDERID, F_DATANAME, F_SATELITE, F_SENSOR, F_RECEIVETIME, F_DATASIZE, 
+                F_DATASOURCE, F_STATUS, F_DATAPATH, F_TASKID, F_DATATYPE, F_NODEID, F_DOCNUM, 
+                F_DATAID, F_TM, F_FEEDBACK_CUSTOM_STATUS, F_FEEDBACK_OTHER_REQUEST, 
+                F_FEEDBACK_TREAT_TIME, F_WKTRESPONSE, F_PRODUCTLEVEL, F_DOCNUM_OLD, F_NODENAME, 
+                F_SGTABLENAME, F_DID, F_PUSH_STATUS, F_PUSH_START, F_PUSH_FINISH, 
+                F_TRANSFER_STATUS, F_ORDER_TASK_ID, F_TRANSFER_COUNT, F_RECEIVE_STATUS, 
+                F_PRODUCTID, F_SCENEID, F_CLOUDPERCENT, F_ORDER, F_ORBITID, F_SCENEPATH, 
+                F_SCENEROW, F_ISASK, F_LOG, F_SYNC, F_SENDMQ
+            )
+            VALUES (
+                :F_ID, :F_ORDERID, :F_DATANAME, :F_SATELITE, :F_SENSOR, TO_DATE(:F_RECEIVETIME, 'YYYY-MM-DD"T"HH24:MI:SS'), :F_DATASIZE, 
+                :F_DATASOURCE, :F_STATUS, :F_DATAPATH, :F_TASKID, :F_DATATYPE, :F_NODEID, :F_DOCNUM, 
+                :F_DATAID, :F_TM, :F_FEEDBACK_CUSTOM_STATUS, :F_FEEDBACK_OTHER_REQUEST, 
+                :F_FEEDBACK_TREAT_TIME, :F_WKTRESPONSE, :F_PRODUCTLEVEL, :F_DOCNUM_OLD, :F_NODENAME, 
+                :F_SGTABLENAME, :F_DID, :F_PUSH_STATUS, :F_PUSH_START, :F_PUSH_FINISH, 
+                :F_TRANSFER_STATUS, :F_ORDER_TASK_ID, :F_TRANSFER_COUNT, :F_RECEIVE_STATUS, 
+                :F_PRODUCTID, :F_SCENEID, :F_CLOUDPERCENT, :F_ORDER, :F_ORBITID, :F_SCENEPATH, 
+                :F_SCENEROW, :F_ISASK, :F_LOG, :F_SYNC, :F_SENDMQ
+            )
+            """
+            cursor.execute(sql, data)
+            conn.commit()
+            logger.info("插入订单数据{}成功".format(orderId))
+        except Exception as e:
+            logger.error("插入订单数据{}错误:{}".format(orderId, e))
+        finally:
+            cursor.close()
+            conn.close()
+            
+    # 将文件信息插入TF_ORDER表中
+    def insertOrder(self,data):
+        try:
+            conn = self.pool.connection()
+            cursor = conn.cursor()
+            sql = """
+            MERGE INTO TF_ORDER t
+            USING (SELECT :F_ORDERNAME AS F_ORDERNAME FROM dual) d
+            ON (t.F_ORDERNAME = d.F_ORDERNAME)
+            WHEN NOT MATCHED THEN
+            INSERT (F_ID, F_ORDERNAME, F_ORDERCODE, F_CREATTIME, F_UPDATETIME, F_USERID, F_DISTFREQUENCY, 
+                    F_STARTTIME, F_ENDTIME, F_STATUS, F_DISTMETHOD, F_TYPE, F_DESCRIPTION, F_PATHRULE, 
+                    F_QUERY, F_DELAYTIME, F_SITENAME, F_ISCREATED, F_LEVEL, F_APPLYUSER, F_APPLYUSERPHONE, 
+                    F_APPLYUSERUSED, F_APPLYUSERUNIT, F_DATATYPE, F_LEFTUPLONGITUDE, F_LEFTUPIMENSION, 
+                    F_RIGHTDOWNLONGITUDE, F_RIGHTDOWNIMENSION, F_SPACETYPE, F_COUNTRYSPACE, F_PROVINCESPACE, 
+                    F_CITYSPACE, F_TOWNSSPACE, F_SHPPATH, F_SATELLITE, F_SENSOR, F_CLOUDAMOUNT, F_SATLEVEL, 
+                    F_USER_CARDID, F_GET_METHOD, F_PRODUCT_NAME, F_DATA_SUM, F_EXPECTED_APPLICATION_EFFECT, 
+                    F_LOGIN_USER, DOWNLOD_PATH_FILE, F_CAUSE, F_PUSH_ID, F_DATA_TYPE_ID, F_GEOMETRY_ID, 
+                    F_EXECUTE_TIME, F_TASK_STATUS, F_ORDER, F_PROCESS_DESCRIBE, F_ASSIGNMENT, F_DATACOUNT, 
+                    F_SYSTEMTYPE, F_JDDM, F_TYFILEDOWN, F_PASSWORD, F_TYORDERID, F_TYOTHERINFO, F_ORDERLOG, 
+                    F_TALLYGAG, F_NDWAY, F_ORDER_STATUS, F_RESPONSESPEED, F_SERVICEATTITUDE, F_FEEDBACKUPLOAD, 
+                    F_MODIFYTYPE, F_SUBASSIGNMENT, F_EXTRACTINGELEMENTS, F_FEEDBACK, F_APPRAISE, F_SYNC, 
+                    F_AUDITOR, F_DATASIZEKB, F_REPORTED)
+            VALUES (:F_ID, :F_ORDERNAME, :F_ORDERCODE, TO_TIMESTAMP(:F_CREATTIME, 'YYYY-MM-DD"T"HH24:MI:SS.FF6'), 
+                    TO_TIMESTAMP(:F_UPDATETIME,'YYYY-MM-DD"T"HH24:MI:SS.FF6'),
+                    :F_USERID, :F_DISTFREQUENCY, 
+                    :F_STARTTIME, :F_ENDTIME, :F_STATUS, :F_DISTMETHOD, :F_TYPE, :F_DESCRIPTION, :F_PATHRULE, 
+                    :F_QUERY, :F_DELAYTIME, :F_SITENAME, :F_ISCREATED, :F_LEVEL, :F_APPLYUSER, :F_APPLYUSERPHONE, 
+                    :F_APPLYUSERUSED, :F_APPLYUSERUNIT, :F_DATATYPE, :F_LEFTUPLONGITUDE, :F_LEFTUPIMENSION, 
+                    :F_RIGHTDOWNLONGITUDE, :F_RIGHTDOWNIMENSION, :F_SPACETYPE, :F_COUNTRYSPACE, :F_PROVINCESPACE, 
+                    :F_CITYSPACE, :F_TOWNSSPACE, :F_SHPPATH, :F_SATELLITE, :F_SENSOR, :F_CLOUDAMOUNT, :F_SATLEVEL, 
+                    :F_USER_CARDID, :F_GET_METHOD, :F_PRODUCT_NAME, :F_DATA_SUM, :F_EXPECTED_APPLICATION_EFFECT, 
+                    :F_LOGIN_USER, :DOWNLOD_PATH_FILE, :F_CAUSE, :F_PUSH_ID, :F_DATA_TYPE_ID, :F_GEOMETRY_ID, 
+                    :F_EXECUTE_TIME, :F_TASK_STATUS, :F_ORDER, :F_PROCESS_DESCRIBE, :F_ASSIGNMENT, :F_DATACOUNT, 
+                    :F_SYSTEMTYPE, :F_JDDM, :F_TYFILEDOWN, :F_PASSWORD, :F_TYORDERID, :F_TYOTHERINFO, :F_ORDERLOG, 
+                    :F_TALLYGAG, :F_NDWAY, :F_ORDER_STATUS, :F_RESPONSESPEED, :F_SERVICEATTITUDE, :F_FEEDBACKUPLOAD, 
+                    :F_MODIFYTYPE, :F_SUBASSIGNMENT, :F_EXTRACTINGELEMENTS, :F_FEEDBACK, :F_APPRAISE, :F_SYNC, 
+                    :F_AUDITOR, :F_DATASIZEKB, :F_REPORTED)
+        """
+            cursor.execute(sql, data)
+            conn.commit()
+            ordername = data.get("F_ORDERNAME")
+            logger.info("插入订单{}成功".format(ordername))
+        except Exception as e:
+            logger.error("插入订单{}错误: {}".format(ordername, e))
+        finally:
+            cursor.close()
+            conn.close()

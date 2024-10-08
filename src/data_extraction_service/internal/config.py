@@ -1,12 +1,15 @@
 import pathlib
 original_data_base_path = [pathlib.Path(r"O:\原始影像数据库"), pathlib.Path(r"R:\GF_BDSS\原始影像数据库")]
 order_base_path = pathlib.Path(r"Y:/shareJGF/order/extract/requirements")
+order_base_order_path = pathlib.Path(r"Y:/shareJGF/order/extract/requirements/order")
+order_base_order_data_path = pathlib.Path(r"Y:/shareJGF/order/extract/requirements/order_data")
 order_base_response_path = pathlib.Path(r"Y:\shareJGF\order\extract\responses")
 order_data_base_path = pathlib.Path(r"Y:/shareJGF/order/data")
 
 interval = 10
-order_worker_num = 5
+order_worker_num = 10
 file_copy_worker_num = 10
+data_sync_filename_split_speratator = "__"
 
 # Data type index definition
 #e.g.: "GF1_PMS1_E53.8_N30.1_20240101_L1A13226391001.tar.gz"

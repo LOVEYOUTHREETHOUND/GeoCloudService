@@ -3,6 +3,7 @@ import oracledb
 import config.dbconfig as dbconfig
 from dbutils.pooled_db import PooledDB
 
+oracledb.init_oracle_client()
 def create_dbconn():
     db_config = dbconfig.database
     username = db_config.get('user')

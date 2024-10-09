@@ -3,7 +3,7 @@ from data_extraction_service.external.schedule.orderProcess import OrderProcess
 import time
 
 myOrderProcess = OrderProcess()
-myOrderProcess.writeOrderData()
+myOrderProcess.sendEmail("20240924WP00003")
 # myOrderProcess.justForTest()
 # myOrderProcess.readOrderData()
 

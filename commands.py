@@ -5,4 +5,6 @@ def data_extraction_internal():
 
 def data_extraction_external():
     # @LYF Deal with this function
+    from src.data_extraction_service.external.main import main
+    main()
     pass

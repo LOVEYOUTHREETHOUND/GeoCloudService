@@ -5,18 +5,20 @@ import json
 import logging
 from src.utils.logger import logger
 import shutil
-from multiprocessing import Pool, Process, Queue, Lock
+from multiprocessing import Pool, Process, Queue, Lock, Manager
 import concurrent.futures
+import os
 from typing import List
 import schedule
 from src.utils.db.mapper import Mapper
-import os
+from src.utils.db.oracle import create_pool
 
 
 # Order file name:
 # <order_name>__<data_name>.json
 # Order file content:
 # Same as TF_ORDER table in Oracle DB
+
 
 
 def main():
@@ -33,16 +35,9 @@ def data_extract():
     # Read from Drivers
     order_path = config.order_base_path
     path = config.order_base_order_path
-    # with Pool(config.order_worker_num ) as p:
-        # p.map(extract_file, [(f, logger) for f in order_path.iterdir()])
-        # p.map(extract_file, [(f) for f in order_path.iterdir()])
-        # p.map(sync_order, [(f) for f in path.iterdir()])
-    with concurrent.futures.ThreadPoolExecutor(config.order_worker_num) as executor:
-        orderdata_files = list(order_path.iterdir())
-        executor.map(extract_file, orderdata_files)
-        order_files = list(path.iterdir())
-        executor.map(sync_order, order_files)
-
+    with Pool(config.order_worker_num) as p:
+        p.map(extract_file, [(f, logger) for f in order_path.iterdir()])
+        p.map(sync_order, [(f) for f in path.iterdir()])
 
 
 def extract_file(f: pathlib.Path, logger: logging.Logger):
@@ -53,7 +48,6 @@ def extract_file(f: pathlib.Path, logger: logging.Logger):
     """
     order_path = config.order_base_path
     
-    
     if f.is_file() and f.suffix == ".json":
         logger.info(f"Start to extract file {f.name}")
         order_name, order_data = f.name.split(config.data_sync_filename_split_speratator)
@@ -61,12 +55,12 @@ def extract_file(f: pathlib.Path, logger: logging.Logger):
         copy_data(order_data, order_name)
         # Clear requirement file  
         path = order_path / f
-        mapper = Mapper()
+        pool = create_pool()
+        mapper = Mapper(pool)
         
         with open(path,"r", encoding="utf-8") as file:
             data = json.load(file)
             mapper.insertOrderData(data)
-            file.close()
             
         f.unlink()
  
@@ -74,11 +68,11 @@ def extract_file(f: pathlib.Path, logger: logging.Logger):
 def sync_order(f : pathlib.Path):
     order_path = config.order_base_order_path
     path = order_path / f
-    mapper = Mapper()
+    pool = create_pool()
+    mapper = Mapper(pool)
     with open(path,"r", encoding="utf-8") as file:
         data = json.load(file)
         mapper.insertOrder(data)
-        file.close()
     os.remove(path)
         
 

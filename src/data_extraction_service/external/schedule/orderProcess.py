@@ -1,14 +1,15 @@
-import utils.db.mapper as mapper
-from  utils.logger import logger
+import src.utils.db.mapper as mapper
+from  src.utils.logger import logger
+from src.utils.Email import send_email
 import os
 import json
-import config.Json_config as Json_config
+import src.config.Json_config as Json_config
 from concurrent.futures import ThreadPoolExecutor
-import time
 import string
 import random
 from datetime import datetime,timedelta
 import hashlib
+
 
 class OrderProcess:
     def __init__(self):
@@ -45,15 +46,19 @@ class OrderProcess:
                 orderresult = self.mapper.getAllByOrderIdFromOrder(id[0])[0]
                 # print (orderresult)
                 orderresult = convert_datetime_to_str(orderresult)
-                with open(orderpath + '/' +'{}.json'.format(id[1]), 'w') as f:
-                    f.write(json.dumps(orderresult, indent=4, ensure_ascii=False))
+                filepath = orderpath + '/' +'{}.json'.format(id[1])
+                if not os.path.exists(filepath):
+                    with open(filepath, 'w') as f:
+                        f.write(json.dumps(orderresult, indent=4, ensure_ascii=False))
                     
                 dataname = self.mapper.getDatanameByOrderId(id[0])
                 for data in dataname:
                     dataresult = self.mapper.getAllByOrderIdFromOrderData(id[0], data[0])[0]
                     dataresult = convert_datetime_to_str(dataresult)
-                    with open(datapath + '/' +'{}__{}.json'.format(id[1],data[0]), 'w') as f:
-                        f.write(json.dumps(dataresult, indent=4, ensure_ascii=False))
+                    jsonpath = datapath + '/' +'{}__{}.json'.format(id[1],data[0])
+                    if not os.path.exists(jsonpath):
+                        with open(jsonpath, 'w') as f:
+                            f.write(json.dumps(dataresult, indent=4, ensure_ascii=False))
             
             self.executor.map(writeJsonFile, idlist) 
             # end = time.time()
@@ -65,7 +70,7 @@ class OrderProcess:
     # 创建Serv-U用户
     def createServUUser(self,ordername):
         try:
-            logger.debug("正在创建Serv-U用户 %s" % ordername)
+            logger.info("正在创建Serv-U用户 %s" % ordername)
             # 当前时间为起始时间
             starttime = int(datetime.now().timestamp())
             # 默认过期时间为两周
@@ -87,7 +92,7 @@ class OrderProcess:
             pwd, md5 = createPwd()
             self.mapper.insertServUInfo(starttime, endtime, ordername, md5)
             self.mapper.insertServUPwd(ordername, pwd, md5)
-            logger.debug("Serv-U用户 %s 创建成功" % ordername)
+            logger.info("Serv-U用户 %s 创建成功" % ordername)
         except Exception as e:
             logger.error("Serv-U用户{}创建失败:{}" .format(ordername, e))
                 
@@ -104,8 +109,8 @@ class OrderProcess:
                 strlist = filename.split('__')
                 ordername = strlist[0]
                 # 数据名常以.tar.gz结尾，所以需要去掉后缀
-                if strlist[1].endswith(('tar.gz')):
-                    strlist[1] = strlist[1][:-7]
+                if strlist[1].endswith(('tar')):
+                    strlist[1] = strlist[1][:-4]
                 orderdata = strlist[1]
                 id = self.mapper.getIdByOrdername(ordername)
                 self.mapper.updateDataStatusByNameAndId(orderdata, id)
@@ -113,6 +118,7 @@ class OrderProcess:
                 if(self.mapper.getCountByOrderId(id) == 0):
                     self.mapper.updateOrderStatusByOrdername(ordername)
                     self.createServUUser(ordername)
+                    # self.sendEmail(ordername)
                 
             self.executor.map(process_file, filelist)
             
@@ -121,6 +127,20 @@ class OrderProcess:
             logger.info("订单状态更新成功")
         except Exception as e:
             logger.error("订单状态更新失败: %s" % e)
+
+    # 向数据准备完成的用户发送邮件
+    def sendEmail(self,ordername):
+        try:
+            logger.info("订单%s正在发送邮件" % ordername)
+            # 获取用户邮箱
+            userId = self.mapper.getUserIdByOrdername(ordername)
+            email = self.mapper.getEmailByUserId(userId)
+            subject = "地质云卫星数据服务-订单数据准备完成-{}".format(ordername)
+            massage = "您好，您的地质云卫星数据服务订单【{}】数据准备完成,请在14天内进行数据下载,14天后将不能下载。【中国地质调查局自然资源航空物探遥感中心】".format(ordername)
+            send_email(subject, massage, email)
+            logger.info("订单{}邮件发送成功".format(ordername))
+        except Exception as e:
+            logger.error("订单{}邮件发送失败:{}".format(ordername, e))
     
     # 此函数用于生成readOrderData函数的测试数据 
     def justForTest(self):
@@ -131,12 +151,4 @@ class OrderProcess:
             for data in result:
                 file = open(path + '/' +'{}__{}.tar.gz'.format(id[1],data[0]), 'w')
                 file.close()
-
-        
-        
-        
-        
-        
-
-
-        
+    

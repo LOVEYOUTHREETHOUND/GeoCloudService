@@ -1,11 +1,15 @@
 # from geocloudservice.db import oracle
-from utils.db.oracle import Mypool 
-import config.mapper_config as mapper_config 
-import utils.logger as logger
+# from src.utils.db.oracle import Mypool 
+from src.utils.db.oracle import create_pool
+import src.config.mapper_config as mapper_config 
+import src.utils.logger as logger
 
 class Mapper:
     def __init__(self):
-        self.pool = Mypool
+        self.pool = create_pool()
+        
+    # def __init__(self,pool):
+    #     self.pool = pool
         
     # 从TF_ORDER里面查询最近20条未处理的订单ID和订单名
     def getIdByStatus(self):
@@ -146,22 +150,23 @@ class Mapper:
             cursor = conn.cursor()
             
             sql1 = """
-            INSERT INTO FTP_SUUSERS (
-            "StatisticsStartTime", "RtServerStartTime", "RtDailyCount", "LoginID", 
-            "PasswordChangedOn", "PasswordEncryptMode", "PasswordUTF8", "Password", 
-            "Type", "ExpiresOn", "HomeDir", "IncludeRespCodesInMsgFiles", 
-            "ODBCVersion", "Quota"
-            ) 
-            SELECT 
-                :starttime, :starttime, :RtDailyCount, :ordername, 
-                :endtime, '1', '1', :pwd, 
-                '2', :endtime, 'Z:\\shareJGF\\order\\data\\' || :ordername, 
-                '1', '4', '0'
-            FROM FTP_SUUSERS
-            WHERE NOT EXISTS (
-                SELECT 1 FROM FTP_SUUSERS WHERE "LoginID" = :ordername
-            )
-            """
+                MERGE INTO FTP_SUUSERS t
+                USING (SELECT :ordername AS LoginID FROM dual) d
+                ON (t."LoginID" = d.LoginID)
+                WHEN NOT MATCHED THEN
+                INSERT (
+                    "StatisticsStartTime", "RtServerStartTime", "RtDailyCount", "LoginID", 
+                    "PasswordChangedOn", "PasswordEncryptMode", "PasswordUTF8", "Password", 
+                    "Type", "ExpiresOn", "HomeDir", "IncludeRespCodesInMsgFiles", 
+                    "ODBCVersion", "Quota"
+                ) 
+                VALUES (
+                    :starttime, :starttime, :RtDailyCount, :ordername, 
+                    :endtime, '1', '1', :pwd, 
+                    '2', :endtime, 'Z:\\shareJGF\\order\\data\\' || :ordername, 
+                    '1', '4', '0'
+                )
+                """
             # print("Executing SQL 1:", sql1)
             cursor.execute(sql1, {
                 'starttime': starttime,
@@ -171,16 +176,17 @@ class Mapper:
                 'pwd': pwd
             })
             sql2 = """
-            INSERT INTO FTP_USERDIRACCESS (
-            "LoginID", "SortIndex", "Dir", "Access"
-            ) 
-            SELECT 
-                :ordername, 1, 'Z:\\shareJGF\\order\\data\\' || :ordername, '4383'
-            FROM FTP_USERDIRACCESS
-            WHERE NOT EXISTS (
-                SELECT 1 FROM FTP_USERDIRACCESS WHERE "LoginID" = :ordername
-            )
-            """
+                MERGE INTO FTP_USERDIRACCESS t
+                USING (SELECT :ordername AS LoginID FROM dual) d
+                ON (t."LoginID" = d.LoginID)
+                WHEN NOT MATCHED THEN
+                INSERT (
+                    "LoginID", "SortIndex", "Dir", "Access"
+                ) 
+                VALUES (
+                    :ordername, 1, 'Z:\\shareJGF\\order\\data\\' || :ordername, '4383'
+                )
+                """
             
             # print("SQL 1 executed successfully")
             
@@ -214,7 +220,7 @@ class Mapper:
             conn.close()
      
     # 从TF_ORDER表中查询测试订单
-    def seleteTestOrder(self):
+    def getTestOrder(self):
         try:
             conn = self.pool.connection()
             cursor = conn.cursor()
@@ -267,9 +273,9 @@ class Mapper:
             """
             cursor.execute(sql, data)
             conn.commit()
-            logger.info("插入订单数据{}成功".format(orderId))
+            logger.info("订单数据{}插入成功".format(orderId))
         except Exception as e:
-            logger.error("插入订单数据{}错误:{}".format(orderId, e))
+            logger.error("订单数据{}插入错误:{}".format(orderId, e))
         finally:
             cursor.close()
             conn.close()
@@ -316,9 +322,39 @@ class Mapper:
             cursor.execute(sql, data)
             conn.commit()
             ordername = data.get("F_ORDERNAME")
-            logger.info("插入订单{}成功".format(ordername))
+            logger.info("订单{}插入成功".format(ordername))
         except Exception as e:
-            logger.error("插入订单{}错误: {}".format(ordername, e))
+            logger.error("订单{}插入错误: {}".format(ordername, e))
         finally:
             cursor.close()
             conn.close()
+     
+    # 根据用户Id获取用户邮箱 
+    def getEmailByUserId(self,UserId):
+        try:
+            conn = self.pool.connection()
+            cursor = conn.cursor()
+            sql = "SELECT F_EMAIL FROM TC_SYS_USER WHERE F_ID = {}".format(UserId)
+            cursor.execute(sql)
+            result = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return result[0][0]
+        except Exception as e:
+            logger.error("获取用户邮箱错误: %s" % e)
+            return ""
+        
+    # 根据订单名获取用户id
+    def getUserIdByOrdername(self,ordername):
+        try:
+            conn = self.pool.connection()
+            cursor = conn.cursor()
+            sql = "SELECT F_USERID FROM TF_ORDER WHERE F_ORDERNAME = '{}'".format(ordername)
+            cursor.execute(sql)
+            result = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return result[0][0]
+        except Exception as e:
+            logger.error("获取用户ID错误: %s" % e)
+            return 0

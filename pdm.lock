@@ -4,11 +4,8 @@
 [metadata]
 groups = ["default"]
 strategy = ["cross_platform", "inherit_metadata"]
-lock_version = "4.5.0"
-content_hash = "sha256:eaff3ee72ece48cd9e946da190a2a330824100cde2ba9b6751cdb4361fb8ea89"
-
-[[metadata.targets]]
-requires_python = "==3.11.*"
+lock_version = "4.4.1"
+content_hash = "sha256:dfa4aa5f0d9a7ab20c7c47a651bc9c84e046aff7d3f40ea292cca3e998ef7b8b"
 
 [[package]]
 name = "blinker"
@@ -55,7 +52,6 @@ summary = "Composable command line interface toolkit"
 groups = ["default"]
 dependencies = [
     "colorama; platform_system == \"Windows\"",
-    "importlib-metadata; python_version < \"3.8\"",
 ]
 files = [
     {file = "click-8.1.7-py3-none-any.whl", hash = "sha256:ae74fb96c20a0277a1d615f1e4d73c8414f5a98db8b799a7931d1582f3390c28"},
@@ -151,12 +147,40 @@ dependencies = [
     "Werkzeug>=3.0.0",
     "blinker>=1.6.2",
     "click>=8.1.3",
-    "importlib-metadata>=3.6.0; python_version < \"3.10\"",
     "itsdangerous>=2.1.2",
 ]
 files = [
     {file = "flask-3.0.3-py3-none-any.whl", hash = "sha256:34e815dfaa43340d1d15a5c3a02b8476004037eb4840b34910c6e21679d288f3"},
     {file = "flask-3.0.3.tar.gz", hash = "sha256:ceb27b0af3823ea2737928a4d99d125a06175b8512c445cbd9a9ce200ef76842"},
+]
+
+[[package]]
+name = "flask-httpauth"
+version = "4.8.0"
+summary = "HTTP authentication for Flask routes"
+groups = ["default"]
+dependencies = [
+    "flask",
+]
+files = [
+    {file = "Flask-HTTPAuth-4.8.0.tar.gz", hash = "sha256:66568a05bc73942c65f1e2201ae746295816dc009edd84b482c44c758d75097a"},
+    {file = "Flask_HTTPAuth-4.8.0-py3-none-any.whl", hash = "sha256:a58fedd09989b9975448eef04806b096a3964a7feeebc0a78831ff55685b62b0"},
+]
+
+[[package]]
+name = "flask-siwadoc"
+version = "0.2.2"
+requires_python = ">=3.6"
+summary = "flask openapi(swagger) doc generator"
+groups = ["default"]
+dependencies = [
+    "flask",
+    "flask-httpauth==4.8.0",
+    "pydantic==1.9.0",
+]
+files = [
+    {file = "flask-siwadoc-0.2.2.tar.gz", hash = "sha256:0279b8cd3a2aeb4824d28c001d9d8bd05c911e744effcb592e2fd94327a6266c"},
+    {file = "flask_siwadoc-0.2.2-py3-none-any.whl", hash = "sha256:7fb51bef1a5c0bc543a04c00c197c6635fb5c8e051a5528b0655daf09f6d76c0"},
 ]
 
 [[package]]
@@ -246,6 +270,20 @@ files = [
 ]
 
 [[package]]
+name = "pydantic"
+version = "1.9.0"
+requires_python = ">=3.6.1"
+summary = "Data validation and settings management using python 3.6 type hinting"
+groups = ["default"]
+dependencies = [
+    "typing-extensions>=3.7.4.3",
+]
+files = [
+    {file = "pydantic-1.9.0-py3-none-any.whl", hash = "sha256:085ca1de245782e9b46cefcf99deecc67d418737a1fd3f6a4f511344b613a5b3"},
+    {file = "pydantic-1.9.0.tar.gz", hash = "sha256:742645059757a56ecd886faf4ed2441b9c0cd406079c2b4bee51bcc3fbcd510a"},
+]
+
+[[package]]
 name = "pytz"
 version = "2024.2"
 summary = "World timezone definitions, modern and historical"
@@ -275,6 +313,17 @@ groups = ["default"]
 files = [
     {file = "setuptools-75.1.0-py3-none-any.whl", hash = "sha256:35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"},
     {file = "setuptools-75.1.0.tar.gz", hash = "sha256:d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538"},
+]
+
+[[package]]
+name = "typing-extensions"
+version = "4.12.2"
+requires_python = ">=3.8"
+summary = "Backported and Experimental Type Hints for Python 3.8+"
+groups = ["default"]
+files = [
+    {file = "typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"},
+    {file = "typing_extensions-4.12.2.tar.gz", hash = "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8"},
 ]
 
 [[package]]

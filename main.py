@@ -17,6 +17,6 @@ match args.subparsers:
     case 'external':
         commands.data_extraction_external()
     case 'web':
-        print("Web")
+        commands.run_web()
     case _:
         print("Invalid command")

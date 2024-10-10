@@ -19,7 +19,7 @@ def send_email(subject, message,to_email):
         user = emailconfig["user"]
         from_email = emailconfig["from_email"]
         password = emailconfig["password"]
-        server = smtplib.SMTP_SSL(host)
+        server = smtplib.SMTP(host)
         server.connect(host,25)
         # server.starttls()
         server.login(user, password)
@@ -33,14 +33,8 @@ def send_email(subject, message,to_email):
         print(e)
         print("邮件发送失败")
 
-# def send_email(subject, message, to_email):
-#     try:
-        
+subject = "测试邮件"
+message = "这是一封测试邮件"
+to_email = "2435184615@qq.com"
 
-# 使用示例
-# subject = "测试邮件"
-# message = "这是一封测试邮件。"
-# to_email = "2435184615@qq.com"
-
-
-# send_email(subject, message, to_email)
+send_email(subject, message, to_email)

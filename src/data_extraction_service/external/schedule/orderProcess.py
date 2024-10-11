@@ -3,7 +3,7 @@ from  src.utils.logger import logger
 from src.utils.Email import send_email
 import os
 import json
-import src.config.Json_config as Json_config
+import src.config.config as config
 from concurrent.futures import ThreadPoolExecutor
 import string
 import random
@@ -14,8 +14,8 @@ import hashlib
 class OrderProcess:
     def __init__(self):
         self.mapper = mapper.Mapper()
-        self.config = Json_config.JsonConfig
-        max_workers = self.config.get("max_workers")
+        # max_workers = self.config.get("max_workers")
+        max_workers = config.JSON_MAX_WORKERS
         self.executor = ThreadPoolExecutor(max_workers)
 
     # 将未处理的订单名与订单数据名写入文件
@@ -24,8 +24,10 @@ class OrderProcess:
             logger.info("正在将未处理的订单名与订单数据名写入文件")
             # start = time.time()
             idlist = self.mapper.getIdByStatus()
-            datapath = self.config.get("writeorderdatapath")
-            orderpath = self.config.get("writeorderpath")
+            # datapath = self.config.get("writeorderdatapath")
+            datapath = config.JSON_WRITE_ORDERDATA_PATH
+            orderpath = config.JSON_WRITE_ORDER_PATH
+            # orderpath = self.config.get("writeorderpath")
             
             def convert_datetime_to_str(data):
                 if isinstance(data, dict):
@@ -102,7 +104,8 @@ class OrderProcess:
         try:
             logger.info("正在更新订单状态")
             # start = time.time()
-            path = self.config.get("readpath")
+            # path = self.config.get("readpath")
+            path = config.JSON_READ_PATH
             filelist = os.listdir(path)
             
             def process_file(filename):
@@ -145,7 +148,8 @@ class OrderProcess:
     # 此函数用于生成readOrderData函数的测试数据 
     def justForTest(self):
         idlist = self.mapper.getIdByStatus()
-        path = self.config.get("readpath")
+        # path = self.config.get("readpath")
+        path = config.JSON_READ_PATH
         for id in idlist:
             result = self.mapper.getDatanameByOrderId(id[0])
             for data in result:

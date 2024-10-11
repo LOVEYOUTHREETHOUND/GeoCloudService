@@ -1,13 +1,14 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from src.config.email_config import emailconfig
+# from src.config.email_config import emailconfig
+import src.config.config as config
 
 def send_email(subject, message,to_email):
     try:
         # 创建一个MIMEMultipart对象
         msg = MIMEMultipart()
-        msg['From'] = emailconfig["from_email"]
+        msg['From'] = config.MAIL_FROM_EMAIL
         msg['To'] = to_email
         msg['Subject'] = subject
 
@@ -15,13 +16,13 @@ def send_email(subject, message,to_email):
         msg.attach(MIMEText(message, 'plain'))
 
         # 创建SMTP对象并连接到SMTP服务器
-        host = emailconfig["smtpHost"]
-        user = emailconfig["user"]
-        from_email = emailconfig["from_email"]
-        password = emailconfig["password"]
+ 
+        host = config.MAIL_SMTPHOST
+        user = config.MAIL_USER
+        from_email = config.MAIL_FROM_EMAIL
+        password = config.MAIL_PWD
         server = smtplib.SMTP(host)
         server.connect(host,25)
-        # server.starttls()
         server.login(user, password)
 
         # 发送邮件
@@ -32,9 +33,3 @@ def send_email(subject, message,to_email):
     except Exception as e:
         print(e)
         print("邮件发送失败")
-
-subject = "测试邮件"
-message = "这是一封测试邮件"
-to_email = "2435184615@qq.com"
-
-send_email(subject, message, to_email)

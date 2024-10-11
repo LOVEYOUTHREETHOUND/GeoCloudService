@@ -1,7 +1,8 @@
 # from geocloudservice.db import oracle
 # from src.utils.db.oracle import Mypool 
 from src.utils.db.oracle import create_pool
-import src.config.mapper_config as mapper_config 
+# import src.config.mapper_config as mapper_config 
+import src.config.config as config
 import src.utils.logger as logger
 
 class Mapper:
@@ -14,8 +15,9 @@ class Mapper:
     # 从TF_ORDER里面查询最近20条未处理的订单ID和订单名
     def getIdByStatus(self):
         try:
-            config = mapper_config.mapconfig
-            count = config.get("process_count")
+            # config = mapper_config.mapconfig
+            # count = config.get("process_count")
+            count = config.JSON_PROCESS_COUNT
             # pool = oracle.create_pool()
             conn = self.pool.connection()
             cursor = conn.cursor()

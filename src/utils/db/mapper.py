@@ -4,21 +4,18 @@ from src.utils.db.oracle import create_pool
 # import src.config.mapper_config as mapper_config 
 import src.config.config as config
 import src.utils.logger as logger
+import threading 
 
 class Mapper:
     def __init__(self):
         self.pool = create_pool()
-        
-    # def __init__(self,pool):
-    #     self.pool = pool
+        self.lock = threading.Lock()   
+
         
     # 从TF_ORDER里面查询最近20条未处理的订单ID和订单名
     def getIdByStatus(self):
         try:
-            # config = mapper_config.mapconfig
-            # count = config.get("process_count")
             count = config.JSON_PROCESS_COUNT
-            # pool = oracle.create_pool()
             conn = self.pool.connection()
             cursor = conn.cursor()
             sql = "SELECT F_ID, F_ORDERNAME FROM (SELECT F_ID, F_ORDERNAME FROM TF_ORDER WHERE F_STATUS = 1 \
@@ -50,26 +47,28 @@ class Mapper:
     # 根据订单名在TF_ORDER中更新订单状态
     def updateOrderStatusByOrdername(self,f_ordername):
         try:
-            conn = self.pool.connection()
-            cursor = conn.cursor()
-            sql = "UPDATE TF_ORDER SET F_STATUS = 6 WHERE F_ORDERNAME = '{}'".format(f_ordername)
-            cursor.execute(sql)
-            conn.commit()
-            cursor.close()
-            conn.close()
+            with self.lock:
+                conn = self.pool.connection()
+                cursor = conn.cursor()
+                sql = "UPDATE TF_ORDER SET F_STATUS = 6 WHERE F_ORDERNAME = '{}'".format(f_ordername)
+                cursor.execute(sql)
+                conn.commit()
+                cursor.close()
+                conn.close()
         except Exception as e:
             logger.error("更新订单状态错误: %s" % e)
 
     # 根据订阅数据名和订单ID在TF_ORDERDATA中更新订阅数据状态
     def updateDataStatusByNameAndId(self,f_dataname, f_orderid):
         try:
-            conn = self.pool.connection()
-            cursor = conn.cursor()
-            sql = "UPDATE TF_ORDERDATA SET F_STATUS = 0 WHERE F_DATANAME = '{}' AND F_ORDERID = '{}'".format(f_dataname, f_orderid)
-            cursor.execute(sql)
-            conn.commit()
-            cursor.close()
-            conn.close()
+            with self.lock:
+                conn = self.pool.connection()
+                cursor = conn.cursor()
+                sql = "UPDATE TF_ORDERDATA SET F_STATUS = 0 WHERE F_DATANAME = '{}' AND F_ORDERID = '{}'".format(f_dataname, f_orderid)
+                cursor.execute(sql)
+                conn.commit()
+                cursor.close()
+                conn.close()
         except Exception as e:
             logger.error("更新订单数据状态错误: %s" % e)
         

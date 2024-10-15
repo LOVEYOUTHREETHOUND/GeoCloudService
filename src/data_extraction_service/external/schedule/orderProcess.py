@@ -4,17 +4,18 @@ from src.utils.Email import send_email
 import os
 import json
 import src.config.config as config
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import string
 import random
 from datetime import datetime,timedelta
 import hashlib
+import threading
 
 
 class OrderProcess:
     def __init__(self):
         self.mapper = mapper.Mapper()
-        # max_workers = self.config.get("max_workers")
+        self.lock = threading.Lock()
         max_workers = config.JSON_MAX_WORKERS
         self.executor = ThreadPoolExecutor(max_workers)
 
@@ -22,12 +23,9 @@ class OrderProcess:
     def writeOrderData(self):
         try:
             logger.info("正在将未处理的订单名与订单数据名写入文件")
-            # start = time.time()
             idlist = self.mapper.getIdByStatus()
-            # datapath = self.config.get("writeorderdatapath")
             datapath = config.JSON_WRITE_ORDERDATA_PATH
             orderpath = config.JSON_WRITE_ORDER_PATH
-            # orderpath = self.config.get("writeorderpath")
             
             def convert_datetime_to_str(data):
                 if isinstance(data, dict):
@@ -63,8 +61,6 @@ class OrderProcess:
                             f.write(json.dumps(dataresult, indent=4, ensure_ascii=False))
             
             self.executor.map(writeJsonFile, idlist) 
-            # end = time.time()
-            # print('writeOrderData cost time:', end - start)
             logger.info("文件写入成功")
         except Exception as e:
             logger.error("文件写入失败: %s" % e)
@@ -103,8 +99,6 @@ class OrderProcess:
     def readOrderData(self):
         try:
             logger.info("正在更新订单状态")
-            # start = time.time()
-            # path = self.config.get("readpath")
             path = config.JSON_READ_PATH
             filelist = os.listdir(path)
             
@@ -119,14 +113,19 @@ class OrderProcess:
                 self.mapper.updateDataStatusByNameAndId(orderdata, id)
                 os.remove(path + '/' + filename)
                 if(self.mapper.getCountByOrderId(id) == 0):
-                    self.mapper.updateOrderStatusByOrdername(ordername)
-                    self.createServUUser(ordername)
-                    # self.sendEmail(ordername)
-                
-            self.executor.map(process_file, filelist)
+                    with self.lock:
+                        self.mapper.updateOrderStatusByOrdername(ordername)
+                        self.createServUUser(ordername)
+                        # self.sendEmail(ordername)
+
+            futures = {self.executor.submit(process_file, filename): filename for filename in filelist}
+            for future in as_completed(futures):
+                filename = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"处理文件 {filename} 时出错: {e}")
             
-            # end = time.time()
-            # print('readOrderData cost time:', end - start)
             logger.info("订单状态更新成功")
         except Exception as e:
             logger.error("订单状态更新失败: %s" % e)
@@ -148,11 +147,10 @@ class OrderProcess:
     # 此函数用于生成readOrderData函数的测试数据 
     def justForTest(self):
         idlist = self.mapper.getIdByStatus()
-        # path = self.config.get("readpath")
         path = config.JSON_READ_PATH
         for id in idlist:
             result = self.mapper.getDatanameByOrderId(id[0])
             for data in result:
-                file = open(path + '/' +'{}__{}.tar.gz'.format(id[1],data[0]), 'w')
+                file = open(path + '/' +'{}__{}.tar'.format(id[1],data[0]), 'w')
                 file.close()
     

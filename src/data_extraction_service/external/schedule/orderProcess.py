@@ -18,6 +18,7 @@ class OrderProcess:
         self.lock = threading.Lock()
         max_workers = config.JSON_MAX_WORKERS
         self.executor = ThreadPoolExecutor(max_workers)
+        self.processed_orders = set()
 
     # 将未处理的订单名与订单数据名写入文件
     def writeOrderData(self):
@@ -105,7 +106,7 @@ class OrderProcess:
             def process_file(filename):
                 strlist = filename.split('__')
                 ordername = strlist[0]
-                # 数据名常以.tar.gz结尾，所以需要去掉后缀
+                # 数据名常以.tar结尾，所以需要去掉后缀
                 if strlist[1].endswith(('tar')):
                     strlist[1] = strlist[1][:-4]
                 orderdata = strlist[1]
@@ -114,9 +115,11 @@ class OrderProcess:
                 os.remove(path + '/' + filename)
                 if(self.mapper.getCountByOrderId(id) == 0):
                     with self.lock:
-                        self.mapper.updateOrderStatusByOrdername(ordername)
-                        self.createServUUser(ordername)
-                        # self.sendEmail(ordername)
+                        if ordername not in self.processed_orders:
+                            self.processed_orders.add(ordername)
+                            self.mapper.updateOrderStatusByOrdername(ordername)
+                            self.createServUUser(ordername)
+                            # self.sendEmail(ordername)  
 
             futures = {self.executor.submit(process_file, filename): filename for filename in filelist}
             for future in as_completed(futures):
@@ -143,6 +146,27 @@ class OrderProcess:
             logger.info("订单{}邮件发送成功".format(ordername))
         except Exception as e:
             logger.error("订单{}邮件发送失败:{}".format(ordername, e))
+            
+    def updateTestOrder(self):
+        try:
+            one_week_ago = (datetime.now() - timedelta(weeks=1)).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            logger.info("正在处理过期测试订单,时间范围为%s之前" % one_week_ago)
+            orders = self.mapper.getTestOrder(one_week_ago)
+            
+            def processTestOrder(order):
+                with self.lock:
+                    self.mapper.insertTestOrder(order)
+                    f_id = order['F_ID']
+                    count = self.mapper.getTestOrderCountByID(f_id)
+                    if count > 0 :
+                        logger.info("订单%s已成功插入TF_ORDER_TEST" % f_id)
+                        self.mapper.deleteTestOrder(f_id)
+                    
+            self.executor.map(processTestOrder, orders)
+            logger.info("过期测试订单处理成功")
+        except Exception as e:
+            logger.error("过期测试订单处理失败: %s" % e)
+                
     
     # 此函数用于生成readOrderData函数的测试数据 
     def justForTest(self):

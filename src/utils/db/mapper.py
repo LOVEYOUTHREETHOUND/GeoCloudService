@@ -9,6 +9,7 @@ import threading
 class Mapper:
     def __init__(self):
         self.pool = create_pool()
+        # self.pool = pool
         self.lock = threading.Lock()   
 
         
@@ -221,23 +222,90 @@ class Mapper:
             conn.close()
      
     # 从TF_ORDER表中查询测试订单
-    def getTestOrder(self):
+    def getTestOrder(self, one_week_ago):
         try:
+            logger.info("正在查询测试订单")
             conn = self.pool.connection()
             cursor = conn.cursor()
-            sql = "SELECT * \
-                    FROM TF_ORDER \
-                    WHERE F_PRODUCT_NAME LIKE '%测试%' \
-                    OR F_PRODUCT_NAME LIKE '%test%' \
-                    OR F_PRODUCT_NAME LIKE '%Test%';"
-            cursor.execute(sql)
-            result = cursor.fetchall()
+            sql = """
+            SELECT * 
+            FROM TF_ORDER 
+            WHERE (F_PRODUCT_NAME LIKE '%测试%' 
+                OR F_PRODUCT_NAME LIKE '%test%' 
+                OR F_PRODUCT_NAME LIKE '%Test%')
+                AND (
+                    (F_UPDATETIME IS NOT NULL AND F_UPDATETIME < TO_TIMESTAMP(:one_week_ago, 'YYYY-MM-DD HH24:MI:SS.FF3'))
+                    OR (F_UPDATETIME IS NULL AND F_CREATTIME < TO_TIMESTAMP(:one_week_ago, 'YYYY-MM-DD HH24:MI:SS.FF3'))
+                )
+            """
+            cursor.execute(sql, {'one_week_ago': one_week_ago})
+            columns = [col[0] for col in cursor.description]
+            result = [dict(zip(columns, row)) for row in cursor.fetchall()]
             cursor.close()
             conn.close()
+            logger.info("测试订单查询完成")
             return result
         except Exception as e:
             logger.error("查询测试订单错误: %s" % e)
             return []
+        
+    # 向TF_ORDER_TEST表中插入测试订单
+    def insertTestOrder(self,order):
+        try:
+            logger.info("正在插入测试订单")
+            conn = self.pool.connection()
+            cursor = conn.cursor()
+            columns = ', '.join([f'"{col}"' for col in order.keys()])
+            values = ', '.join([f':{col}' for col in order.keys()])
+            sql = f"""
+            MERGE INTO TF_ORDER_TEST t
+            USING (SELECT 1 FROM dual) d
+            ON (t.F_ID = :F_ID)
+            WHEN NOT MATCHED THEN
+            INSERT ({columns})
+            VALUES ({values})
+            """
+            
+            cursor.execute(sql, order)
+            conn.commit()
+            cursor.close()
+            conn.close()
+            logger.info("测试订单插入完成")
+        except Exception as e:
+            logger.error("插入测试订单错误: %s" % e)
+        
+    # 查询TF_ORDER_TEST表中是否含有对应订单
+    def getTestOrderCountByID(self, F_ID):
+        try:
+            logger.info("正在查询测试订单%s" % F_ID) 
+            conn = self.pool.connection()
+            cursor = conn.cursor()
+            sql = f"SELECT COUNT(*) FROM TF_ORDER_TEST WHERE F_ID = {F_ID}"
+            cursor.execute(sql)
+            result = cursor.fetchall()[0][0]
+            cursor.close()
+            conn.close()
+            logger.info("测试订单%s查询完成" % F_ID)
+            return result
+        except Exception as e:
+            logger.error("查询测试订单错误: %s" % e)
+            return 0
+        
+    # 从TF_ORDER中删除测试订单
+    def deleteTestOrder(self, F_ID):
+        try:
+            logger.info("正在从TF_ORDER中删除测试订单%s" % F_ID)
+            conn = self.pool.connection()
+            cursor = conn.cursor()
+            sql = f"DELETE FROM TF_ORDER WHERE F_ID = {F_ID}"
+            cursor.execute(sql)
+            conn.commit()
+            cursor.close()
+            conn.close()
+            logger.info("测试订单%s成功从TF_ORDER中删除" % F_ID)
+        except Exception as e:
+            logger.error("删除测试订单错误: %s" % e)
+              
 
     # 将文件信息插入TF_ORDERDATA表中
     def insertOrderData(self,data):

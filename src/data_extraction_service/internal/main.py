@@ -35,18 +35,22 @@ def data_extract():
     # Read from Drivers
     order_path = config.order_base_path
     path = config.order_base_order_path
+    # order_path = pathlib.Path("/home/ic2dev/lyf/GeoCloudService/Json/order")
+    # path = pathlib.Path("/home/ic2dev/lyf/GeoCloudService/Json/orderdata")
     with Pool(config.order_worker_num) as p:
         p.map(extract_file, [(f, logger) for f in order_path.iterdir()])
         p.map(sync_order, [(f) for f in path.iterdir()])
 
 
-def extract_file(f: pathlib.Path, logger: logging.Logger):
+# def extract_file(f: pathlib.Path, logger: logging.Logger):
+def extract_file(f: pathlib.Path, pool):
     """
         Extract order data from order list
         Example file name: 
         "20240924WP00001__GF1_PMS1_E53.8_N30.1_20240101_L1A13226391001.json"
     """
     order_path = config.order_base_path
+    # order_path = pathlib.Path("/home/ic2dev/lyf/GeoCloudService/Json/order")
     
     if f.is_file() and f.suffix == ".json":
         logger.info(f"Start to extract file {f.name}")
@@ -55,7 +59,7 @@ def extract_file(f: pathlib.Path, logger: logging.Logger):
         copy_data(order_data, order_name)
         # Clear requirement file  
         path = order_path / f
-        pool = create_pool()
+        # pool = create_pool()
         mapper = Mapper(pool)
         
         with open(path,"r", encoding="utf-8") as file:
@@ -65,10 +69,11 @@ def extract_file(f: pathlib.Path, logger: logging.Logger):
         f.unlink()
  
 # 用于同步TF_ORDER表数据到内网 
-def sync_order(f : pathlib.Path):
+def sync_order(f : pathlib.Path, pool):
     order_path = config.order_base_order_path
+    # order_path = pathlib.Path("/home/ic2dev/lyf/GeoCloudService/Json/orderdata")
     path = order_path / f
-    pool = create_pool()
+    # pool = create_pool()
     mapper = Mapper(pool)
     with open(path,"r", encoding="utf-8") as file:
         data = json.load(file)

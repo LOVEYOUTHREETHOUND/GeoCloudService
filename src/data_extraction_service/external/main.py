@@ -19,8 +19,8 @@ def main():
     #     schedule.run_pending()
     #     time.sleep(1)
     # MyProcess.justForTest()
-    # MyProcess.writeOrderData()
-    MyProcess.updateTestOrder()
+    MyProcess.writeOrderData()
+    # MyProcess.updateTestOrder()
     # MyProcess.readOrderData()
     # data_extract()
 

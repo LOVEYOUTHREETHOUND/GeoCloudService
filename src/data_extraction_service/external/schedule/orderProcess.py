@@ -57,7 +57,7 @@ class OrderProcess:
                 for data in dataname:
                     dataresult = self.mapper.getAllByOrderIdFromOrderData(id[0], data[0])[0]
                     dataresult = convert_datetime_to_str(dataresult)
-                    jsonpath = datapath + '/' +'{}__{}.json'.format(id[1],data[0])
+                    jsonpath = datapath + '/' +'{}__{}__{}.json'.format(id[1],data[0],id[2])
                     if not os.path.exists(jsonpath):
                         with open(jsonpath, 'w') as f:
                             f.write(json.dumps(dataresult, indent=4, ensure_ascii=False))

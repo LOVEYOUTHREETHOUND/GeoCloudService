@@ -36,7 +36,7 @@ class Mapper:
     def getIdByStatus(self):
         try:
             count = config.JSON_PROCESS_COUNT
-            sql = "SELECT F_ID, F_ORDERNAME FROM (SELECT F_ID, F_ORDERNAME FROM TF_ORDER WHERE F_STATUS = 1 \
+            sql = "SELECT F_ID, F_ORDERNAME, F_GET_METHOD FROM (SELECT F_ID, F_ORDERNAME, F_GET_METHOD FROM TF_ORDER WHERE F_STATUS = 1 \
                     AND F_ORDERNAME IS NOT NULL ORDER BY F_ORDERNAME DESC) WHERE ROWNUM <= : count"
             result = self.executeQuery(sql, {'count': count})
             return result

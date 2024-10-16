@@ -16,6 +16,7 @@ dependencies = [
     "datetime>=5.5",
     "flask-siwadoc>=0.2.2",
     "pydantic>=1.9.0",
+    "geopandas>=1.0.1",
 ]
 requires-python = "==3.11.*"
 readme = "README.md"

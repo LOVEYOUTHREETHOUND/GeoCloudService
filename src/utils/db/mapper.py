@@ -1,15 +1,12 @@
-# from geocloudservice.db import oracle
-# from src.utils.db.oracle import Mypool 
-from src.utils.db.oracle import create_pool
-# import src.config.mapper_config as mapper_config 
+from src.utils.db.oracle import Mypool
 import src.config.config as config
 import src.utils.logger as logger
 import threading 
 
 class Mapper:
-    def __init__(self):
-        self.pool = create_pool()
-        # self.pool = pool
+    def __init__(self, pool = Mypool):
+        # self.pool = create_pool()
+        self.pool = pool
         self.lock = threading.Lock()   
 
         
@@ -17,7 +14,7 @@ class Mapper:
     def getIdByStatus(self):
         try:
             count = config.JSON_PROCESS_COUNT
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = "SELECT F_ID, F_ORDERNAME FROM (SELECT F_ID, F_ORDERNAME FROM TF_ORDER WHERE F_STATUS = 1 \
                     AND F_ORDERNAME IS NOT NULL ORDER BY F_ORDERNAME DESC) WHERE ROWNUM <= {}".format(count)
@@ -33,7 +30,7 @@ class Mapper:
     #根据订单ID从TF_ORDERDATA里面查询订阅数据名 
     def getDatanameByOrderId(self,f_orderid):
         try:
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = "SELECT F_DATANAME FROM TF_ORDERDATA WHERE F_ORDERID = {} AND F_STATUS = 1".format(f_orderid)
             cursor.execute(sql)
@@ -49,7 +46,7 @@ class Mapper:
     def updateOrderStatusByOrdername(self,f_ordername):
         try:
             with self.lock:
-                conn = self.pool.connection()
+                conn = self.pool.acquire()
                 cursor = conn.cursor()
                 sql = "UPDATE TF_ORDER SET F_STATUS = 6 WHERE F_ORDERNAME = '{}'".format(f_ordername)
                 cursor.execute(sql)
@@ -63,7 +60,7 @@ class Mapper:
     def updateDataStatusByNameAndId(self,f_dataname, f_orderid):
         try:
             with self.lock:
-                conn = self.pool.connection()
+                conn = self.pool.acquire()
                 cursor = conn.cursor()
                 sql = "UPDATE TF_ORDERDATA SET F_STATUS = 0 WHERE F_DATANAME = '{}' AND F_ORDERID = '{}'".format(f_dataname, f_orderid)
                 cursor.execute(sql)
@@ -76,7 +73,7 @@ class Mapper:
     # 根据订单名获取订单ID(f_orderid)
     def getIdByOrdername(self,f_ordername):
         try:
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = "SELECT F_ID FROM TF_ORDER WHERE F_ORDERNAME = '{}'".format(f_ordername)
             cursor.execute(sql)
@@ -91,7 +88,7 @@ class Mapper:
     # 根据订单ID获取未完成的订单数量
     def getCountByOrderId(self,f_orderid):
         try:
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = "SELECT COUNT(*) FROM TF_ORDERDATA WHERE F_ORDERID = {} AND F_STATUS = 1".format(f_orderid)
             cursor.execute(sql)
@@ -107,7 +104,7 @@ class Mapper:
     # 返回格式为列名：数据
     def getAllByOrderIdFromOrder(self,f_orderid):
         try:
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = "SELECT * FROM TF_ORDER WHERE F_ID = {}".format(f_orderid)
             cursor.execute(sql)
@@ -126,7 +123,7 @@ class Mapper:
     # 返回格式为列名：数据
     def getAllByOrderIdFromOrderData(self,f_orderid,f_dataname):
         try:
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = "SELECT * FROM TF_ORDERDATA \
                 WHERE F_ORDERID = {} AND F_DATANAME = '{}'".format(f_orderid,f_dataname)
@@ -148,7 +145,7 @@ class Mapper:
     def insertServUInfo(self, starttime ,endtime, ordername, pwd):
         RtDailyCount = "0,14,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
         try:
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             
             sql1 = """
@@ -206,7 +203,7 @@ class Mapper:
     # 向TF_ORDER表中对应用户插入密码
     def insertServUPwd(self, ordername, pwd, md5):
         try:
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             
             sql1 = "UPDATE TF_ORDER SET F_PASSWORD = '{}' WHERE F_ORDERNAME = '{}'".format(pwd, ordername)
@@ -225,7 +222,7 @@ class Mapper:
     def getTestOrder(self, one_week_ago):
         try:
             logger.info("正在查询测试订单")
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = """
             SELECT * 
@@ -253,7 +250,7 @@ class Mapper:
     def insertTestOrder(self,order):
         try:
             logger.info("正在插入测试订单")
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             columns = ', '.join([f'"{col}"' for col in order.keys()])
             values = ', '.join([f':{col}' for col in order.keys()])
@@ -278,7 +275,7 @@ class Mapper:
     def getTestOrderCountByID(self, F_ID):
         try:
             logger.info("正在查询测试订单%s" % F_ID) 
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = f"SELECT COUNT(*) FROM TF_ORDER_TEST WHERE F_ID = {F_ID}"
             cursor.execute(sql)
@@ -295,7 +292,7 @@ class Mapper:
     def deleteTestOrder(self, F_ID):
         try:
             logger.info("正在从TF_ORDER中删除测试订单%s" % F_ID)
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = f"DELETE FROM TF_ORDER WHERE F_ID = {F_ID}"
             cursor.execute(sql)
@@ -312,7 +309,7 @@ class Mapper:
         try:
             orderId = data.get("F_ID")
             # logger.info("正在插入订单数据{}".format(orderId))
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = """
             MERGE INTO TF_ORDERDATA t
@@ -352,7 +349,7 @@ class Mapper:
     # 将文件信息插入TF_ORDER表中
     def insertOrder(self,data):
         try:
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = """
             MERGE INTO TF_ORDER t
@@ -401,7 +398,7 @@ class Mapper:
     # 根据用户Id获取用户邮箱 
     def getEmailByUserId(self,UserId):
         try:
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = "SELECT F_EMAIL FROM TC_SYS_USER WHERE F_ID = {}".format(UserId)
             cursor.execute(sql)
@@ -416,7 +413,7 @@ class Mapper:
     # 根据订单名获取用户id
     def getUserIdByOrdername(self,ordername):
         try:
-            conn = self.pool.connection()
+            conn = self.pool.acquire()
             cursor = conn.cursor()
             sql = "SELECT F_USERID FROM TF_ORDER WHERE F_ORDERNAME = '{}'".format(ordername)
             cursor.execute(sql)

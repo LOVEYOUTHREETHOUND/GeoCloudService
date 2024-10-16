@@ -8,20 +8,37 @@ class Mapper:
         # self.pool = create_pool()
         self.pool = pool
         self.lock = threading.Lock()   
-
+        
+    # 执行查询语句
+    def executeQuery(self, sql, params=None):
+        try:
+            with self.pool.acquire() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(sql, params)
+                    result = cursor.fetchall()
+                    return result
+        except Exception as e:
+            logger.error("查询错误: {}, SQL: {}".format(e, sql))
+            raise e
+    
+    # 执行非查询语句
+    def executeNonQuery(self, sql, params=None):
+        try:
+            with self.pool.acquire() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(sql, params)
+                    conn.commit()
+        except Exception as e:
+            logger.error("执行错误: {}, SQL: {}".format(e, sql))
+            raise e
         
     # 从TF_ORDER里面查询最近20条未处理的订单ID和订单名
     def getIdByStatus(self):
         try:
             count = config.JSON_PROCESS_COUNT
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
             sql = "SELECT F_ID, F_ORDERNAME FROM (SELECT F_ID, F_ORDERNAME FROM TF_ORDER WHERE F_STATUS = 1 \
-                    AND F_ORDERNAME IS NOT NULL ORDER BY F_ORDERNAME DESC) WHERE ROWNUM <= {}".format(count)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            cursor.close()
-            conn.close()
+                    AND F_ORDERNAME IS NOT NULL ORDER BY F_ORDERNAME DESC) WHERE ROWNUM <= : count"
+            result = self.executeQuery(sql, {'count': count})
             return result
         except Exception as e:
             logger.error("获取订单ID错误: %s" % e)
@@ -30,13 +47,8 @@ class Mapper:
     #根据订单ID从TF_ORDERDATA里面查询订阅数据名 
     def getDatanameByOrderId(self,f_orderid):
         try:
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            sql = "SELECT F_DATANAME FROM TF_ORDERDATA WHERE F_ORDERID = {} AND F_STATUS = 1".format(f_orderid)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            cursor.close()
-            conn.close()
+            sql = "SELECT F_DATANAME FROM TF_ORDERDATA WHERE F_ORDERID = :F_ORDERID AND F_STATUS = 1"
+            result = self.executeQuery(sql, {'F_ORDERID': f_orderid})
             return result
         except Exception as e:
             logger.error("获取订阅数据名错误: %s" % e)
@@ -46,13 +58,8 @@ class Mapper:
     def updateOrderStatusByOrdername(self,f_ordername):
         try:
             with self.lock:
-                conn = self.pool.acquire()
-                cursor = conn.cursor()
-                sql = "UPDATE TF_ORDER SET F_STATUS = 6 WHERE F_ORDERNAME = '{}'".format(f_ordername)
-                cursor.execute(sql)
-                conn.commit()
-                cursor.close()
-                conn.close()
+                sql = "UPDATE TF_ORDER SET F_STATUS = 6 WHERE F_ORDERNAME = :F_ORDERNAME"
+                self.executeNonQuery(sql, {'F_ORDERNAME': f_ordername})
         except Exception as e:
             logger.error("更新订单状态错误: %s" % e)
 
@@ -60,26 +67,16 @@ class Mapper:
     def updateDataStatusByNameAndId(self,f_dataname, f_orderid):
         try:
             with self.lock:
-                conn = self.pool.acquire()
-                cursor = conn.cursor()
-                sql = "UPDATE TF_ORDERDATA SET F_STATUS = 0 WHERE F_DATANAME = '{}' AND F_ORDERID = '{}'".format(f_dataname, f_orderid)
-                cursor.execute(sql)
-                conn.commit()
-                cursor.close()
-                conn.close()
+                sql = "UPDATE TF_ORDERDATA SET F_STATUS = 0 WHERE F_DATANAME = :F_DATANAME AND F_ORDERID = :F_ORDERID"
+                self.executeNonQuery(sql, {'F_DATANAME': f_dataname, 'F_ORDERID': f_orderid})
         except Exception as e:
             logger.error("更新订单数据状态错误: %s" % e)
         
     # 根据订单名获取订单ID(f_orderid)
     def getIdByOrdername(self,f_ordername):
         try:
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            sql = "SELECT F_ID FROM TF_ORDER WHERE F_ORDERNAME = '{}'".format(f_ordername)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            cursor.close()
-            conn.close()
+            sql = "SELECT F_ID FROM TF_ORDER WHERE F_ORDERNAME = :F_ORDERNAME"
+            result = self.executeQuery(sql, {'F_ORDERNAME': f_ordername})
             return result[0][0]
         except Exception as e:
             logger.error("获取订单ID错误: %s" % e)
@@ -88,13 +85,8 @@ class Mapper:
     # 根据订单ID获取未完成的订单数量
     def getCountByOrderId(self,f_orderid):
         try:
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            sql = "SELECT COUNT(*) FROM TF_ORDERDATA WHERE F_ORDERID = {} AND F_STATUS = 1".format(f_orderid)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            cursor.close()
-            conn.close()
+            sql = "SELECT COUNT(*) FROM TF_ORDERDATA WHERE F_ORDERID = :F_ORDERID AND F_STATUS = 1"
+            result = self.executeQuery(sql, {'F_ORDERID': f_orderid})
             return result[0][0]
         except Exception as e:
             logger.error("获取订单数量错误: %s" % e)
@@ -104,14 +96,12 @@ class Mapper:
     # 返回格式为列名：数据
     def getAllByOrderIdFromOrder(self,f_orderid):
         try:
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            sql = "SELECT * FROM TF_ORDER WHERE F_ID = {}".format(f_orderid)
-            cursor.execute(sql)
-            columns = [col[0] for col in cursor.description]
-            result = cursor.fetchall()
-            cursor.close()
-            conn.close()
+            with self.pool.acquire() as conn:
+                with conn.cursor() as cursor:
+                    sql = "SELECT * FROM TF_ORDER WHERE F_ID = :F_OEDERID"
+                    cursor.execute(sql, {'F_OEDERID': f_orderid})
+                    columns = [col[0] for col in cursor.description]
+                    result = cursor.fetchall()
             
             data = [dict(zip(columns, row)) for row in result]
             return data
@@ -123,15 +113,13 @@ class Mapper:
     # 返回格式为列名：数据
     def getAllByOrderIdFromOrderData(self,f_orderid,f_dataname):
         try:
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            sql = "SELECT * FROM TF_ORDERDATA \
-                WHERE F_ORDERID = {} AND F_DATANAME = '{}'".format(f_orderid,f_dataname)
-            cursor.execute(sql)
-            columns = [col[0] for col in cursor.description]
-            result = cursor.fetchall()
-            cursor.close()
-            conn.close()
+            with self.pool.acquire() as conn:
+                with conn.cursor() as cursor:
+                    sql = "SELECT * FROM TF_ORDERDATA \
+                        WHERE F_ORDERID = :F_ORDERID AND F_DATANAME = :F_DATANAME"
+                    cursor.execute(sql, {'F_ORDERID': f_orderid, 'F_DATANAME': f_dataname})
+                    columns = [col[0] for col in cursor.description]
+                    result = cursor.fetchall()
             
             data = [dict(zip(columns, row)) for row in result]
             return data
@@ -145,9 +133,6 @@ class Mapper:
     def insertServUInfo(self, starttime ,endtime, ordername, pwd):
         RtDailyCount = "0,14,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
         try:
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            
             sql1 = """
                 MERGE INTO FTP_SUUSERS t
                 USING (SELECT :ordername AS LoginID FROM dual) d
@@ -167,7 +152,7 @@ class Mapper:
                 )
                 """
             # print("Executing SQL 1:", sql1)
-            cursor.execute(sql1, {
+            self.executeNonQuery(sql1, {
                 'starttime': starttime,
                 'RtDailyCount': RtDailyCount,
                 'ordername': ordername,
@@ -186,60 +171,44 @@ class Mapper:
                     :ordername, 1, 'Z:\\shareJGF\\order\\data\\' || :ordername, '4383'
                 )
                 """
-            
-            # print("SQL 1 executed successfully")
-            
-            cursor.execute(sql2, {
+            self.executeNonQuery(sql2, {
                 'ordername': ordername
             })
-            # print("SQL 2 executed successfully")
-            conn.commit()
         except Exception as e:
             logger.error("Serv-U用户创建错误: %s" % e)
-        finally:
-            cursor.close()
-            conn.close()
         
     # 向TF_ORDER表中对应用户插入密码
     def insertServUPwd(self, ordername, pwd, md5):
         try:
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            
-            sql1 = "UPDATE TF_ORDER SET F_PASSWORD = '{}' WHERE F_ORDERNAME = '{}'".format(pwd, ordername)
-            cursor.execute(sql1)
+            sql1 = "UPDATE TF_ORDER SET F_PASSWORD = :PWD WHERE F_ORDERNAME = :ORDERNAME"
+            self.executeNonQuery(sql1, {'PWD': pwd, 'ORDERNAME': ordername})
             # 保证TF_ORDER表中的密码和FTP_SUUSERS表中的密码一致
-            sql2 = "UPDATE FTP_SUUSERS SET \"Password\" = '{}' WHERE \"LoginID\" = '{}'".format(md5, ordername)
-            cursor.execute(sql2)
-            conn.commit()
+            sql2 = "UPDATE FTP_SUUSERS SET \"Password\" = :MD5 WHERE \"LoginID\" = :ORDERNAME"
+            self.executeNonQuery(sql2, {'MD5': md5, 'ORDERNAME': ordername})
         except Exception as e:
             logger.error("Serv-U密码插入错误: %s" % e)
-        finally:
-            cursor.close()
-            conn.close()
      
     # 从TF_ORDER表中查询测试订单
     def getTestOrder(self, one_week_ago):
         try:
             logger.info("正在查询测试订单")
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            sql = """
-            SELECT * 
-            FROM TF_ORDER 
-            WHERE (F_PRODUCT_NAME LIKE '%测试%' 
-                OR F_PRODUCT_NAME LIKE '%test%' 
-                OR F_PRODUCT_NAME LIKE '%Test%')
-                AND (
-                    (F_UPDATETIME IS NOT NULL AND F_UPDATETIME < TO_TIMESTAMP(:one_week_ago, 'YYYY-MM-DD HH24:MI:SS.FF3'))
-                    OR (F_UPDATETIME IS NULL AND F_CREATTIME < TO_TIMESTAMP(:one_week_ago, 'YYYY-MM-DD HH24:MI:SS.FF3'))
-                )
-            """
-            cursor.execute(sql, {'one_week_ago': one_week_ago})
-            columns = [col[0] for col in cursor.description]
-            result = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            cursor.close()
-            conn.close()
+            with self.pool.acquire() as conn:
+                with conn.cursor() as cursor:
+                    sql = """
+                    SELECT * 
+                    FROM TF_ORDER 
+                    WHERE (F_PRODUCT_NAME LIKE '%测试%' 
+                        OR F_PRODUCT_NAME LIKE '%test%' 
+                        OR F_PRODUCT_NAME LIKE '%Test%')
+                        AND (
+                            (F_UPDATETIME IS NOT NULL AND F_UPDATETIME < TO_TIMESTAMP(:one_week_ago, 'YYYY-MM-DD HH24:MI:SS.FF3'))
+                            OR (F_UPDATETIME IS NULL AND F_CREATTIME < TO_TIMESTAMP(:one_week_ago, 'YYYY-MM-DD HH24:MI:SS.FF3'))
+                        )
+                    """
+                    cursor.execute(sql, {'one_week_ago': one_week_ago})
+                    columns = [col[0] for col in cursor.description]
+                    result = [dict(zip(columns, row)) for row in cursor.fetchall()]
+  
             logger.info("测试订单查询完成")
             return result
         except Exception as e:
@@ -250,8 +219,6 @@ class Mapper:
     def insertTestOrder(self,order):
         try:
             logger.info("正在插入测试订单")
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
             columns = ', '.join([f'"{col}"' for col in order.keys()])
             values = ', '.join([f':{col}' for col in order.keys()])
             sql = f"""
@@ -263,10 +230,7 @@ class Mapper:
             VALUES ({values})
             """
             
-            cursor.execute(sql, order)
-            conn.commit()
-            cursor.close()
-            conn.close()
+            self.executeNonQuery(sql, order)
             logger.info("测试订单插入完成")
         except Exception as e:
             logger.error("插入测试订单错误: %s" % e)
@@ -275,13 +239,8 @@ class Mapper:
     def getTestOrderCountByID(self, F_ID):
         try:
             logger.info("正在查询测试订单%s" % F_ID) 
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            sql = f"SELECT COUNT(*) FROM TF_ORDER_TEST WHERE F_ID = {F_ID}"
-            cursor.execute(sql)
-            result = cursor.fetchall()[0][0]
-            cursor.close()
-            conn.close()
+            sql = f"SELECT COUNT(*) FROM TF_ORDER_TEST WHERE F_ID = :F_ID"
+            result = self.executeQuery(sql, {'F_ID': F_ID})[0][0]
             logger.info("测试订单%s查询完成" % F_ID)
             return result
         except Exception as e:
@@ -292,13 +251,8 @@ class Mapper:
     def deleteTestOrder(self, F_ID):
         try:
             logger.info("正在从TF_ORDER中删除测试订单%s" % F_ID)
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            sql = f"DELETE FROM TF_ORDER WHERE F_ID = {F_ID}"
-            cursor.execute(sql)
-            conn.commit()
-            cursor.close()
-            conn.close()
+            sql = f"DELETE FROM TF_ORDER WHERE F_ID = :F_ID"
+            self.executeNonQuery(sql, {'F_ID': F_ID})
             logger.info("测试订单%s成功从TF_ORDER中删除" % F_ID)
         except Exception as e:
             logger.error("删除测试订单错误: %s" % e)
@@ -309,8 +263,6 @@ class Mapper:
         try:
             orderId = data.get("F_ID")
             # logger.info("正在插入订单数据{}".format(orderId))
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
             sql = """
             MERGE INTO TF_ORDERDATA t
             USING (SELECT :F_ID AS F_ID FROM dual) d
@@ -337,20 +289,14 @@ class Mapper:
                 :F_SCENEROW, :F_ISASK, :F_LOG, :F_SYNC, :F_SENDMQ
             )
             """
-            cursor.execute(sql, data)
-            conn.commit()
+            self.executeNonQuery(sql, data)
             logger.info("订单数据{}插入成功".format(orderId))
         except Exception as e:
             logger.error("订单数据{}插入错误:{}".format(orderId, e))
-        finally:
-            cursor.close()
-            conn.close()
             
     # 将文件信息插入TF_ORDER表中
     def insertOrder(self,data):
         try:
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
             sql = """
             MERGE INTO TF_ORDER t
             USING (SELECT :F_ORDERNAME AS F_ORDERNAME FROM dual) d
@@ -385,26 +331,17 @@ class Mapper:
                     :F_MODIFYTYPE, :F_SUBASSIGNMENT, :F_EXTRACTINGELEMENTS, :F_FEEDBACK, :F_APPRAISE, :F_SYNC, 
                     :F_AUDITOR, :F_DATASIZEKB, :F_REPORTED)
         """
-            cursor.execute(sql, data)
-            conn.commit()
+            self.executeNonQuery(sql, data)
             ordername = data.get("F_ORDERNAME")
             logger.info("订单{}插入成功".format(ordername))
         except Exception as e:
             logger.error("订单{}插入错误: {}".format(ordername, e))
-        finally:
-            cursor.close()
-            conn.close()
      
     # 根据用户Id获取用户邮箱 
     def getEmailByUserId(self,UserId):
         try:
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            sql = "SELECT F_EMAIL FROM TC_SYS_USER WHERE F_ID = {}".format(UserId)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            cursor.close()
-            conn.close()
+            sql = "SELECT F_EMAIL FROM TC_SYS_USER WHERE F_ID = :F_ID"
+            result = self.executeQuery(sql, {'F_ID': UserId})
             return result[0][0]
         except Exception as e:
             logger.error("获取用户邮箱错误: %s" % e)
@@ -413,13 +350,8 @@ class Mapper:
     # 根据订单名获取用户id
     def getUserIdByOrdername(self,ordername):
         try:
-            conn = self.pool.acquire()
-            cursor = conn.cursor()
-            sql = "SELECT F_USERID FROM TF_ORDER WHERE F_ORDERNAME = '{}'".format(ordername)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            cursor.close()
-            conn.close()
+            sql = "SELECT F_USERID FROM TF_ORDER WHERE F_ORDERNAME = :F_ORDERNAME"
+            result = self.executeQuery(sql, {'F_ORDERNAME': ordername})
             return result[0][0]
         except Exception as e:
             logger.error("获取用户ID错误: %s" % e)

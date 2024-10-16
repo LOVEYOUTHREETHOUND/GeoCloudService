@@ -20,7 +20,7 @@ def main():
     #     time.sleep(1)
     # MyProcess.justForTest()
     # MyProcess.writeOrderData()
-    # MyProcess.updateTestOrder()
+    MyProcess.updateTestOrder()
     # MyProcess.readOrderData()
     # data_extract()
 

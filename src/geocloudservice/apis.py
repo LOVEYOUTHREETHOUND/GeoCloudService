@@ -2,14 +2,19 @@ from flask import Flask, request, jsonify, Blueprint
 from flask_siwadoc import SiwaDoc
 from waitress import serve
 
-
+from src.geocloudservice.blueprints.spatial_query_bp import spatial_query_blueprint
 from src.geocloudservice.api_models import TimespanQueryModel
+from src.utils.db.oracle import create_pool
 import src.config.config as config
 
 
 def gen_app():
     app = Flask(__name__, )
     siwa = SiwaDoc(app, title="FJY API", description="地质云航遥节点遥感数据服务系统接口文档")
+    pool = create_pool()
+
+    spatial_query_bp = spatial_query_blueprint(siwa, pool)
+    app.register_blueprint(spatial_query_bp)
 
     @app.post(f"/test")
     @siwa.doc(

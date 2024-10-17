@@ -4,8 +4,8 @@
 [metadata]
 groups = ["default"]
 strategy = ["cross_platform", "inherit_metadata"]
-lock_version = "4.4.1"
-content_hash = "sha256:087103da00a913c665debbbc82d0b5f8d649855fe3648eb2c7acc0507c7b670e"
+lock_version = "4.4.2"
+content_hash = "sha256:393e64ee5a0e0dd2b4ba0ba564e8711c749525e43701f508582041ef74aa873a"
 
 [[package]]
 name = "blinker"
@@ -110,15 +110,6 @@ files = [
     {file = "cryptography-43.0.1-cp39-abi3-win32.whl", hash = "sha256:a575913fb06e05e6b4b814d7f7468c2c660e8bb16d8d5a1faf9b33ccc569dd47"},
     {file = "cryptography-43.0.1-cp39-abi3-win_amd64.whl", hash = "sha256:d75601ad10b059ec832e78823b348bfa1a59f6b8d545db3a24fd44362a1564cb"},
     {file = "cryptography-43.0.1.tar.gz", hash = "sha256:203e92a75716d8cfb491dc47c79e17d0d9207ccffcbcb35f598fbe463ae3444d"},
-]
-
-[[package]]
-name = "cx-oracle"
-version = "8.3.0"
-summary = "Python interface to Oracle"
-groups = ["default"]
-files = [
-    {file = "cx_Oracle-8.3.0.tar.gz", hash = "sha256:3b2d215af4441463c97ea469b9cc307460739f89fdfa8ea222ea3518f1a424d9"},
 ]
 
 [[package]]

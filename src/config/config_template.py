@@ -4,15 +4,13 @@
 # Database configuration
 DB_HOST = 'localhost'
 DB_PORT = 5432
-DB_NAME = 'your_database_name'
+DB_DATABASE = 'your_database_name'
 DB_USER = 'your_database_user'
 DB_PASSWORD = 'your_database_password'
 
 # Web API configuration
 web_api_host = 'localhost'
 web_api_port = 12345
-web_api_name = "/api"
-web_api_version = "v1"
-web_api_prefix = f"{web_api_name}/{web_api_version}"
 
-
+# Spatial Computation configuration
+crs = "EPSG:4326"  # Coordinate Reference System, default is WGS84

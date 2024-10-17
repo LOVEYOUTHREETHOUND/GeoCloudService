@@ -1,5 +1,6 @@
 from waitress import serve
 from src.geocloudservice.apis import gen_app
+from src.utils.db.oracle import create_pool
 
 
 def main():

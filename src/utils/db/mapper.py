@@ -1,10 +1,9 @@
-from src.utils.db.oracle import Mypool
 import src.config.config as config
 import src.utils.logger as logger
 import threading 
 
 class Mapper:
-    def __init__(self, pool = Mypool):
+    def __init__(self, pool):
         # self.pool = create_pool()
         self.pool = pool
         self.lock = threading.Lock()   

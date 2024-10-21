@@ -4,7 +4,7 @@ import src.config.config as config
 #oracledb.init_oracle_client()
 
 username = config.DB_USER
-password = config.DB_PASSWORD
+password = config.DB_PWD
 host = config.DB_HOST
 port = config.DB_PORT
 database = config.DB_DATABASE

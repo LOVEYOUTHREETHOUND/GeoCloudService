@@ -15,6 +15,7 @@ class Mapper:
                 with conn.cursor() as cursor:
                     cursor.execute(sql, params)
                     result = cursor.fetchall()
+                    logger.info("查询成功: {}, params: {}".format(sql, params))
                     return result
         except Exception as e:
             logger.error("查询错误: {}, SQL: {}".format(e, sql))

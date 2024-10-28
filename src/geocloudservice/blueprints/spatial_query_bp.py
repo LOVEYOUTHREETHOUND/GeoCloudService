@@ -9,9 +9,19 @@ class BasicResponse(BaseModel):
     links: Dict[str, HttpUrl]  # HATEOAS links
     data: Dict[str, Any]
 
+
+class TimeSpanParam(BaseModel):
+    start_time: datetime.datetime = Field(..., description="查询开始时间")
+    end_time: datetime.datetime = Field(..., description="查询结束时间")
+
+
 class SpatialQueryParam(BaseModel):
     satellite_names: List[str] = Field(..., description="卫星名称列表")
     wkt: str = Field(..., description="WKT格式的空间查询条件")
+
+
+class RecommendParam(TimeSpanParam, SpatialQueryParam):
+    pass
 
 
 class QueryResponse(BasicResponse):
@@ -29,9 +39,9 @@ def spatial_query_blueprint(siwa, pool):
         resp=QueryResponse
     )
     def spatial_query():
-        query_wkt = request.args.get('wkt')
-        satellite_names = request.args.get('satellite_names')
-
+        args = request.args.to_dict(flat=False)
+        query_wkt = args.get('wkt')
+        satellite_names = args.get('satellite_names')
         # 1. Fetch satellite data by name
         data_df = find_data_by_satellite(satellite_names, pool)
 

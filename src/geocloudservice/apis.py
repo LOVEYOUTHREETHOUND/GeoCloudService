@@ -2,21 +2,31 @@ from flask import Flask, request, jsonify, Blueprint
 from flask_siwadoc import SiwaDoc
 from waitress import serve
 import oracledb
+import json
 from flask_cors import CORS
+from marshmallow import ValidationError
+from marshmallow import Schema, fields
+
+
+
+# from src.utils.db.oracle import create_pool
 
 from src.geocloudservice.blueprints.spatial_query_bp import spatial_query_blueprint
 from src.geocloudservice.api_models import TimespanQueryModel
 import src.config.config_template as config
 
 
+
+
 def gen_app():
     app = Flask(__name__,)
     CORS(app)
     siwa = SiwaDoc(app, title="FJY API", description="地质云航遥节点遥感数据服务系统接口文档")
-    pool = create_pool()
+    #cmm20241022用户订单反馈
+    # pool = create_pool()
 
-    spatial_query_bp = spatial_query_blueprint(siwa, pool)
-    app.register_blueprint(spatial_query_bp)
+    # spatial_query_bp = spatial_query_blueprint(siwa, pool)
+    # app.register_blueprint(spatial_query_bp)
 
     @app.post(f"/test")
     @siwa.doc(
@@ -26,47 +36,52 @@ def gen_app():
     )
     def test():
         return jsonify({"code": 200, "msg": "successsss"})
-    bp_stats(app, siwa)
+    # bp_stats(app, siwa)
+    #cmm20241012用户订单反馈接口
     bp_feedback(app, siwa)
+    #cmm20241023已完成订单统计优化
+    bp_stat(app, siwa)
+    # app.register_blueprint(bp_feedback)
+    # app.register_blueprint(bp_stat)
     return app
 
 
-def bp_stats(app, siwa):
-    bp_stats = Blueprint("stats", __name__, url_prefix='/stats')
-    @bp_stats.get("/daily")
-    @siwa.doc(
-        summary="每日统计",
-        description="每日统计",
-        tags=["stats"],
-    )
-    def daily():
-        return jsonify({"code": 200, "msg": "success", "data": "data"})
+# def bp_stats(app, siwa):
+#     bp_stats = Blueprint("stats", __name__, url_prefix='/stats')
+#     @bp_stats.get("/daily")
+#     @siwa.doc(
+#         summary="每日统计",
+#         description="每日统计",
+#         tags=["stats"],
+#     )
+#     def daily():
+#         return jsonify({"code": 200, "msg": "success", "data": "data"})
 
-    @bp_stats.get("/monthly")
-    @siwa.doc(
-        summary="每月统计",
-        description="每月统计",
-        tags=["stats"],
-    )
-    def monthly():
-        return jsonify({"code": 200, "msg": "success"})
+#     @bp_stats.get("/monthly")
+#     @siwa.doc(
+#         summary="每月统计",
+#         description="每月统计",
+#         tags=["stats"],
+#     )
+#     def monthly():
+#         return jsonify({"code": 200, "msg": "success"})
 
-    @bp_stats.get("")
-    @siwa.doc(
-        summary="按时间统计接口",
-        description="按时间统计",
-        tags=["stats"],
-        query=TimespanQueryModel
-    )
-    def stats():
-        return jsonify({"code": 200, "msg": "success"})
+#     @bp_stats.get("")
+#     @siwa.doc(
+#         summary="按时间统计接口",
+#         description="按时间统计",
+#         tags=["stats"],
+#         query=TimespanQueryModel
+#     )
+#     def stats():
+#         return jsonify({"code": 200, "msg": "success"})
 
-    app.register_blueprint(bp_stats)
+#     app.register_blueprint(bp_stats)
     
 
 # cmm20241012用户订单反馈接口
 def bp_feedback(app, siwa):
-    bp_feedback = Blueprint("feedback", __name__, url_prefix='/feedback')
+    bp_feedback = Blueprint("feedback", __name__, url_prefix='/bupt_feedback')
     @bp_feedback.post("/submit")# /feedback/20240926WP00001
     @siwa.doc(
         summary="订单反馈",
@@ -88,11 +103,13 @@ def bp_feedback(app, siwa):
 
             try:
                 # 连接到 Oracle 数据库
-                connection = oracledb.connect(user="JGF_GXFW", password="JGF_GXFW", dsn="62.234.192.247:18881/ORCLCDB")
+                # connection = oracledb.connect(user="JGF_GXFW", password="JGF_GXFW", dsn="62.234.192.247:18881/ORCLCDB")
+                connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
+
                 cursor = connection.cursor()
                 cursor.execute("SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0, 2, 5) AND F_CREATTIME BETWEEN TIMESTAMP '2024-01-01 00:00:00' AND TIMESTAMP '2024-09-28 23:59:59'")
                 user = cursor.fetchone()
-                print(f"连接成功，当前用户: {user[0]}")  # 打印当前用户以验证连接
+                print(f"连接1成功，当前用户: {user[0]}")  # 打印当前用户以验证连接
 
                 # 更新 TF_ORDER 表
                 update_query = """
@@ -118,7 +135,165 @@ def bp_feedback(app, siwa):
                 if connection:
                     connection.close()
 
-              
-
-
     app.register_blueprint(bp_feedback)
+
+#cmm20241023已完成订单统计优化
+def bp_stat(app, siwa):
+    bp_stat = Blueprint("stat", __name__, url_prefix='/bupt_stat')
+    @bp_stat.post("/get")
+    @siwa.doc(
+        summary="已完成订单统计",
+        description="",
+        tags=["stat"],
+        body=TimespanQueryModel 
+    )
+    def get_stat():
+        try:
+            # data = request.get_json()
+            data = json.loads(request.get_data())
+            print('data:', data)
+            # time_list=TimespanQueryModel(**data)
+            time_list = TimespanQueryModel.parse_obj(data["data"])
+            print('time_list:', time_list)
+            start_time = time_list.lessCreattimeStr
+            end_time = time_list.moreCreattimeStr
+                # 校验数据是否包含null值
+
+            if start_time is None and end_time is not None:
+                return {"error": "起始时间未填写！"}, 400  # 返回错误信息和HTTP状态码400
+            if start_time is not None and end_time is None:
+                return {"error": "结束时间未填写！"}, 400  # 返回错误信息和HTTP状态码400
+            if start_time is None and end_time is None:
+                return {"error": "起始时间与结束时间未填写！"}, 400  # 返回错误信息和HTTP状态码400
+            
+            if start_time is not None and end_time is not None and end_time < start_time:
+                return {"error": "结束时间需晚于起始时间！"}, 400  # 返回错误信息和HTTP状态码400
+            # inner_data = schema.load(data)  # 直接加载整个数据
+            # print (inner_data)
+            # start_time = inner_data.get('lessCreattimeStr')
+            # end_time = inner_data.get('moreCreattimeStr')
+            # print(f"接收到的请求体: {data}")
+            print(f"前端收到用户的查询：起始时间{start_time}，结束时间{end_time}")
+                # ... 其他代码
+
+            print('{lessCreattimeStr}', start_time, end_time)
+            print(f"接收到的请求体: {data}")
+            print(f"前端收到用户的查询：起始时间{start_time}，结束时间{end_time}")
+        except ValidationError as err:
+            return jsonify(err.messages), 400
+        
+
+        
+
+        # if not start_time or not end_time:
+        #     return jsonify({'success': False, 'message': '时间不能为空'}), 400
+
+        try:
+            connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
+            cursor = connection.cursor()
+            cursor.execute("SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0, 2, 5) AND F_CREATTIME BETWEEN TIMESTAMP '2024-01-01 00:00:00' AND TIMESTAMP '2024-09-28 23:59:59'")
+            user = cursor.fetchone()
+            print(f"连接成功，当前用户: {user[0]}")  # 打印当前用户以验证连接
+
+            # 使用参数化查询，确保日期格式正确
+            query1 = "SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS=6 AND F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND F_GET_METHOD = :F_GET_METHOD"
+            
+            #离线订单数量offline_order_num
+            cursor.execute(query1, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')
+            offline_order_num = cursor.fetchone()[0]
+
+            #在线订单数量online_order_num
+            cursor.execute(query1, start_time=start_time, end_time=end_time, F_GET_METHOD='在线下载')
+            online_order_num = cursor.fetchone()[0]
+
+            #离线订单数据量offline_order_size
+            query2="SELECT F_DATA_SUM FROM TF_ORDER WHERE F_STATUS=6 AND F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND F_GET_METHOD = :F_GET_METHOD"
+            cursor.execute(query2, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')
+            print(cursor.fetchone())
+            results=cursor.fetchall()
+            # 初始化总和
+            total_sum = 0
+            # 处理每个结果
+            for result in results:
+                if result[0] is None:  # 检查是否为空值
+                    total_sum += 0  # 默认加0
+                    continue  # 跳过空值，继续下一个循环
+                data_sum = result[0].strip()  # 去除空格
+                if data_sum.endswith('M'):
+                    data_sum = data_sum[:-1]  # 去除 'M'
+                    total_sum += float(data_sum)
+                elif data_sum.endswith('G'):
+                    data_sum = data_sum[:-1]  # 去除 'G'
+                    total_sum += float(data_sum) * 1024
+                else:
+                    total_sum = total_sum
+            total_sum=total_sum/1024
+            # print(results)
+            # 打印总和
+            print("离线订单总数据量：", total_sum)
+            offline_order_size = round(total_sum, 0)
+
+            #在线订单数据量online_order_size
+            cursor.execute(query2, start_time=start_time, end_time=end_time, F_GET_METHOD='在线下载')
+            print(cursor.fetchone())
+            results=cursor.fetchall()
+            # 初始化总和
+            total_sum = 0
+            # 处理每个结果
+            for result in results:
+                if result[0] is None:  # 检查是否为空值
+                    total_sum += 0  # 默认加0
+                    continue  # 跳过空值，继续下一个循环
+                data_sum = result[0].strip()  # 去除空格
+                if data_sum.endswith('M'):
+                    data_sum = data_sum[:-1]  # 去除 'M'
+                    total_sum += float(data_sum)
+                elif data_sum.endswith('G'):
+                    data_sum = data_sum[:-1]  # 去除 'G'
+                    total_sum += float(data_sum) * 1024
+                else:
+                    total_sum = total_sum
+            total_sum=total_sum/1024
+            # print(results)
+            # 打印总和
+            print("在线订单总数据量：", total_sum)
+            online_order_size = round(total_sum, 0)
+
+            #离线订单景数offline_order_scene_num
+            query3="SELECT SUM(F_DATACOUNT) FROM TF_ORDER WHERE F_STATUS=6 AND F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND F_GET_METHOD = :F_GET_METHOD"
+            cursor.execute(query3, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')
+            offline_order_scene_num = cursor.fetchone()[0]
+
+            #在线订单景数online_order_scene_num
+            cursor.execute(query3, start_time=start_time, end_time=end_time, F_GET_METHOD='在线下载')
+            online_order_scene_num = cursor.fetchone()[0]
+
+
+               # 构建响应数据
+            order_stats = {
+                "offlineOrderNum": offline_order_num,
+                "onlineOrderNum": online_order_num,
+                "offlineOrderSize": offline_order_size,
+                "onlineOrderSize": online_order_size,
+                "offlineOrderSceneNum": offline_order_scene_num,
+                "onlineOrderSceneNum": online_order_scene_num,
+                "orderSize": offline_order_size + online_order_size  # 总数据量
+                # "OrderSize": offline_order_size + online_order_size  # 总数据量
+            }
+
+            return jsonify(order_stats)
+        # except oracledb.DatabaseError as e:
+        #     error, = e.args
+        #     return jsonify({'success': False, 'message': f'数据库错误: {error.message}'}), 500
+
+
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+        
+
+    app.register_blueprint(bp_stat)
+
+

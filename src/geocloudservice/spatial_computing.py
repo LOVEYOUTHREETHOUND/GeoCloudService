@@ -21,8 +21,15 @@ def coordinates_to_polygon(ordinates: list):
 
 def _query_by_satellite(satellite_name: str) -> str:
     table_name = f"TB_META_{satellite_name}"
-    query_sql = f'SELECT "F_SPATIAL_INFO" FROM {table_name}'
+    query_sql = f'SELECT "F_DATANAME","F_RECEIVETIME","F_SPATIAL_INFO" FROM {table_name}'
     return query_sql
+
+
+def _build_gdf_by_db_res(res: list) -> gpd.GeoDataFrame:
+    polygons = [coordinates_to_polygon(r[-1].SDO_ORDINATES.aslist()) for r in res]
+    df = gpd.GeoDataFrame(geometry=polygons, crs=config.crs)
+    return df
+
 
 def find_data_by_satellite(satellite_names: typing.List[str], pool: oracledb.ConnectionPool) -> gpd.GeoDataFrame:
 
@@ -37,12 +44,12 @@ def find_data_by_satellite(satellite_names: typing.List[str], pool: oracledb.Con
     else:
         table_name = ' UNION '.join([_query_by_satellite(satellite_name) for satellite_name in satellite_names])
         query_sql = f'{table_name} ORDER BY "F_RECEIVETIME" FETCH FIRST :limit_num ROWS ONLY'
-
+    print(query_sql)
     with pool.acquire() as conn:
         with conn.cursor() as cur:
             cur.execute(query_sql, limit_num=100)
             res = cur.fetchall()
-    polygons = [coordinates_to_polygon(r[0].SDO_ORDINATES.aslist()) for r in res]
+    polygons = [coordinates_to_polygon(r[-1].SDO_ORDINATES.aslist()) for r in res]  # FIXME: Index -1 could be in error
     df = gpd.GeoDataFrame(geometry=polygons, crs=config.crs)
     return df
 

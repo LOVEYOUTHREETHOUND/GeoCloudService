@@ -3,14 +3,14 @@
 
 # #oracledb.init_oracle_client()
 
-# username = config.DB_USER
-# password = config.DB_PASSWORD
-# host = config.DB_HOST
-# port = config.DB_PORT
-# database = config.DB_DATABASE
-# max = config.DB_POOL_MAX
-# min = config.DB_POOL_MIN
-# increment = config.DB_POOL_INCREMENT
+username = config.DB_USER
+password = config.DB_PWD
+host = config.DB_HOST
+port = config.DB_PORT
+database = config.DB_DATABASE
+max = config.DB_POOL_MAX
+min = config.DB_POOL_MIN
+increment = config.DB_POOL_INCREMENT
 
 
 # def create_dbconn():

@@ -3,12 +3,14 @@ import time
 
 from src.data_extraction_service.external.schedule import orderProcess
 from src.utils.logger import logger
+from src.utils.db.oracle import create_pool
 import src.config.config as config
 from src.data_extraction_service.internal.main import data_extract
 
 
 def main():
-    MyProcess = orderProcess.OrderProcess()
+    pool = create_pool()
+    MyProcess = orderProcess.OrderProcess(pool)
     # writetime = config.SCHE_WRITE_ORDER_TIME
     # readtime = config.SCHE_READ_ORDER_TIME
     # logger.info(f"Start to run the schedule, write time: {writetime}, read time: {readtime}")
@@ -23,4 +25,3 @@ def main():
     # MyProcess.updateTestOrder()
     # MyProcess.readOrderData()
     # data_extract()
-

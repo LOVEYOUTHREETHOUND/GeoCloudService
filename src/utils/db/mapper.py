@@ -1,10 +1,9 @@
-from src.utils.db.oracle import Mypool
 import src.config.config as config
 import src.utils.logger as logger
 import threading 
 
 class Mapper:
-    def __init__(self, pool = Mypool):
+    def __init__(self, pool):
         # self.pool = create_pool()
         self.pool = pool
         self.lock = threading.Lock()   
@@ -16,6 +15,7 @@ class Mapper:
                 with conn.cursor() as cursor:
                     cursor.execute(sql, params)
                     result = cursor.fetchall()
+                    logger.info("查询成功: {}, params: {}".format(sql, params))
                     return result
         except Exception as e:
             logger.error("查询错误: {}, SQL: {}".format(e, sql))

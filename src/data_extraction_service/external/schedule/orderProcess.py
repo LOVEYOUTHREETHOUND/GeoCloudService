@@ -14,8 +14,8 @@ import threading
 
 
 class OrderProcess:
-    def __init__(self):
-        self.mapper = mapper.Mapper()
+    def __init__(self, pool):
+        self.mapper = mapper.Mapper(pool)
         self.lock = threading.Lock()
         max_workers = config.JSON_MAX_WORKERS
         self.executor = ThreadPoolExecutor(max_workers)
@@ -57,7 +57,10 @@ class OrderProcess:
                 for data in dataname:
                     dataresult = self.mapper.getAllByOrderIdFromOrderData(id[0], data[0])[0]
                     dataresult = convert_datetime_to_str(dataresult)
-                    jsonpath = datapath + '/' +'{}__{}__{}.json'.format(id[1],data[0],id[2])
+                    if id[2] == '在线下载':
+                        jsonpath = datapath + '/' +'{}__{}__{}.json'.format(id[1],data[0],'W')
+                    elif id[2] == '线下拷贝':
+                        jsonpath = datapath + '/' +'{}__{}__{}.json'.format(id[1],data[0],'N')
                     if not os.path.exists(jsonpath):
                         with open(jsonpath, 'w') as f:
                             f.write(json.dumps(dataresult, indent=4, ensure_ascii=False))

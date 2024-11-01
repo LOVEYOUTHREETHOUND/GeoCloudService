@@ -5,7 +5,7 @@ from src.utils.Email import send_email
 import os
 import json
 import src.config.config as config
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 import string
 import random
 from datetime import datetime,timedelta
@@ -19,10 +19,9 @@ class OrderProcess:
         self.lock = threading.Lock()
         max_workers = config.JSON_MAX_WORKERS
         self.executor = ThreadPoolExecutor(max_workers)
-        self.processed_orders = set()
 
     # 将未处理的订单名与订单数据名写入文件
-    def writeOrderData(self):
+    def writePendingOrderToRequire(self):
         try:
             logger.info("正在将未处理的订单名与订单数据名写入文件")
             idlist = self.mapper.getIdByStatus()
@@ -44,40 +43,54 @@ class OrderProcess:
                             convert_datetime_to_str(item)
                 return data
             
-            def writeJsonFile(id):
-                orderresult = self.mapper.getAllByOrderIdFromOrder(id[0])[0]
-                # print (orderresult)
-                orderresult = convert_datetime_to_str(orderresult)
-                filepath = orderpath + '/' +'{}.json'.format(id[1])
-                if not os.path.exists(filepath):
-                    with open(filepath, 'w') as f:
-                        f.write(json.dumps(orderresult, indent=4, ensure_ascii=False))
+            def writeOrderJson(id):
+                try:
+                    orderresult = self.mapper.getAllByOrderIdFromOrder(id[0])[0]
+                    # print (orderresult)
+                    orderresult = convert_datetime_to_str(orderresult)
+                    filepath = orderpath + '/' +'{}.json'.format(id[1])
+                    if not os.path.exists(filepath):
+                        with open(filepath, 'w') as f:
+                            f.write(json.dumps(orderresult, indent=4, ensure_ascii=False))
+                            logger.info('{}.json文件写入成功'.format(id[1]))
+                except Exception as e:
+                    logger.error('{}.json文件写入失败:{}'.format(id[1], e))
                     
-                dataname = self.mapper.getDatanameByOrderId(id[0])
-                for data in dataname:
-                    dataresult = self.mapper.getAllByOrderIdFromOrderData(id[0], data[0])[0]
-                    dataresult = convert_datetime_to_str(dataresult)
-                    if id[2] == '在线下载':
-                        jsonpath = datapath + '/' +'{}__{}__{}.json'.format(id[1],data[0],'W')
-                    elif id[2] == '线下拷贝':
-                        jsonpath = datapath + '/' +'{}__{}__{}.json'.format(id[1],data[0],'N')
-                    if not os.path.exists(jsonpath):
-                        with open(jsonpath, 'w') as f:
-                            f.write(json.dumps(dataresult, indent=4, ensure_ascii=False))
+            def writeOrderDataJson(id):
+                try:
+                    dataname = self.mapper.getDatanameByOrderId(id[0])
+                    for data in dataname:
+                        dataresult = self.mapper.getAllByOrderIdFromOrderData(id[0], data[0])[0]
+                        dataresult = convert_datetime_to_str(dataresult)
+                        filename = ''
+                        if id[2] == '在线下载':
+                            filename =  '{}__{}__{}.json'.format(id[1],data[0],'W')
+                            jsonpath = datapath + "/" + filename
+                        elif id[2] == '线下拷贝':
+                            filename = '{}__{}__{}.json'.format(id[1],data[0],'N')
+                            jsonpath = datapath + '/' + filename
+                        if not os.path.exists(jsonpath):
+                            with open(jsonpath, 'w') as f:
+                                f.write(json.dumps(dataresult, indent=4, ensure_ascii=False))
+                                logger.info('{}文件写入成功'.format(filename))
+                except Exception as e:
+                    logger.error('{}文件写入失败:{}'.format(filename, e))
             
-            self.executor.map(writeJsonFile, idlist) 
-            logger.info("文件写入成功")
+            self.executor.map(writeOrderJson, idlist)
+            self.executor.map(writeOrderDataJson, idlist) 
+            # logger.info("文件写入成功")
         except Exception as e:
             logger.error("文件写入失败: %s" % e)
 
     # 创建Serv-U用户
     def createServUUser(self,ordername):
         try:
+            overdueTime = config.SERVU_USER_OVERDUE_TIME
             logger.info("正在创建Serv-U用户 %s" % ordername)
             # 当前时间为起始时间
             starttime = int(datetime.now().timestamp())
             # 默认过期时间为两周
-            endtime = datetime.now() + timedelta(days=14)
+            endtime = datetime.now() + timedelta(days=overdueTime)
             endtime = int(endtime.timestamp())
             
             # 返回值为原始密码和md5加密后的密码
@@ -101,39 +114,38 @@ class OrderProcess:
                 
     
     # 根据文件中的订单名和订单数据名更新订单状态
-    def readOrderData(self):
+    def updateOrderStatusFromRespond(self):
         try:
             logger.info("正在更新订单状态")
             path = config.JSON_READ_PATH
             filelist = os.listdir(path)
             
             def process_file(filename):
-                strlist = filename.split('__')
-                ordername = strlist[0]
-                # 数据名常以.tar结尾，所以需要去掉后缀
-                if strlist[1].endswith(('tar')):
-                    strlist[1] = strlist[1][:-4]
-                orderdata = strlist[1]
-                id = self.mapper.getIdByOrdername(ordername)
-                self.mapper.updateDataStatusByNameAndId(orderdata, id)
-                os.remove(path + '/' + filename)
-                if(self.mapper.getCountByOrderId(id) == 0):
-                    with self.lock:
-                        if ordername not in self.processed_orders:
-                            self.processed_orders.add(ordername)
+                try:
+                    strlist = filename.split('__')
+                    ordername = strlist[0]
+                    # 数据名常以.tar结尾，所以需要去掉后缀
+                    if strlist[1].endswith(('tar')):
+                        strlist[1] = strlist[1][:-4]
+                    orderdata = strlist[1]
+                    id = self.mapper.getIdByOrdername(ordername)
+                    self.mapper.updateDataStatusByNameAndId(orderdata, id)
+                    os.remove(path + '/' + filename)
+                    count = self.mapper.getCountByOrderId(id)
+                    if(count == 0):
+                        with self.lock:
+                            count = -1
+                            logger.info("订单%s状态更新中" % ordername)
                             self.mapper.updateOrderStatusByOrdername(ordername)
                             self.createServUUser(ordername)
                             # self.sendEmail(ordername)  
-
-            futures = {self.executor.submit(process_file, filename): filename for filename in filelist}
-            for future in as_completed(futures):
-                filename = futures[future]
-                try:
-                    future.result()
+                            logger.info("订单%s状态更新完成" % ordername)
                 except Exception as e:
-                    logger.error(f"处理文件 {filename} 时出错: {e}")
+                    logger.error("订单%s状态更新出错: %s" % (ordername, e))
+
+            self.executor.map(process_file, filelist)
             
-            logger.info("订单状态更新成功")
+            # logger.info("订单状态更新成功")
         except Exception as e:
             logger.error("订单状态更新失败: %s" % e)
 
@@ -151,26 +163,32 @@ class OrderProcess:
         except Exception as e:
             logger.error("订单{}邮件发送失败:{}".format(ordername, e))
             
+    # 清理过期测试订单
     def updateTestOrder(self):
         try:
-            one_week_ago = (datetime.now() - timedelta(weeks=1)).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            logger.info("正在处理过期测试订单,时间范围为%s之前" % one_week_ago)
-            orders = self.mapper.getTestOrder(one_week_ago)
+            overdue_time = config.TEST_ORDER_OVERDUE_TIME
+            overdue = (datetime.now() - timedelta(days=overdue_time)).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            logger.info("正在处理过期测试订单,时间范围为%s之前" % overdue)
+            orders = self.mapper.getTestOrder(overdue)
             
             def processTestOrder(order):
-                with self.lock:
-                    self.mapper.insertTestOrder(order)
-                    f_id = order['F_ID']
-                    count = self.mapper.getTestOrderCountByID(f_id)
-                    if count > 0 :
-                        count = 0
-                        logger.info("订单%s已成功插入TF_ORDER_TEST" % f_id)
-                        self.mapper.deleteTestOrder(f_id)
+                logger.info("正在处理过期测试订单%s" % order['F_ID'])
+                try:
+                    with self.lock:
+                        self.mapper.insertTestOrder(order)
+                        f_id = order['F_ID']
+                        count = self.mapper.getTestOrderCountByID(f_id)
+                        if count > 0 :
+                            count = 0
+                            # logger.info("订单%s已成功插入TF_ORDER_TEST" % f_id)
+                            self.mapper.deleteTestOrder(f_id)
+                            logger.info("过期测试订单%s处理完成" % f_id)
+                except Exception as e:
+                    logger.error("过期测试订单%s处理失败: %s" % (order['F_ID'], e))
                     
             self.executor.map(processTestOrder, orders)
-            logger.info("过期测试订单处理成功")
         except Exception as e:
-            logger.error("过期测试订单处理失败: %s" % e)
+            logger.error("过期测试订单处理错误: %s" % e)
                 
     
     # 此函数用于生成readOrderData函数的测试数据 

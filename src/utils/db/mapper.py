@@ -4,7 +4,6 @@ import threading
 
 class Mapper:
     def __init__(self, pool):
-        # self.pool = create_pool()
         self.pool = pool
         self.lock = threading.Lock()   
         
@@ -18,8 +17,7 @@ class Mapper:
                     # logger.info("查询成功: {}, params: {}".format(sql, params))
                     return result
         except Exception as e:
-            logger.error("查询错误: {}, SQL: {}".format(e, sql))
-            raise e
+            logger.error("SQL查询错误: {}, SQL: {}, params: {}".format(e, sql, params))
     
     # 执行非查询语句
     def executeNonQuery(self, sql, params=None):
@@ -29,8 +27,7 @@ class Mapper:
                     cursor.execute(sql, params)
                     conn.commit()
         except Exception as e:
-            logger.error("执行错误: {}, SQL: {}".format(e, sql))
-            raise e
+            logger.error("SQL执行错误: {}, SQL: {}, params: {}".format(e, sql, params))
         
     # 从TF_ORDER里面查询最近20条未处理的订单ID和订单名
     def getIdByStatus(self):
@@ -128,8 +125,8 @@ class Mapper:
             return data
 
     # 向数据库中插入数据以创建Serv-U用户
-    # 向FTP_SUUSERS表中插入数据以创建用户
-    # 向FTP_USERDIRACCESS表中插入数据以配置用户权限
+    # 1.向FTP_SUUSERS表中插入数据以创建用户
+    # 2.向FTP_USERDIRACCESS表中插入数据以配置用户权限
     def insertServUInfo(self, starttime ,endtime, ordername, pwd):
         RtDailyCount = "0,14,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
         try:
@@ -218,7 +215,7 @@ class Mapper:
     # 向TF_ORDER_TEST表中插入测试订单
     def insertTestOrder(self,order):
         try:
-            logger.info("正在插入测试订单")
+            # logger.info("正在插入测试订单")
             columns = ', '.join([f'"{col}"' for col in order.keys()])
             values = ', '.join([f':{col}' for col in order.keys()])
             sql = f"""
@@ -231,17 +228,17 @@ class Mapper:
             """
             
             self.executeNonQuery(sql, order)
-            logger.info("测试订单插入完成")
+            # logger.info("测试订单插入完成")
         except Exception as e:
             logger.error("插入测试订单错误: %s" % e)
         
     # 查询TF_ORDER_TEST表中是否含有对应订单
     def getTestOrderCountByID(self, F_ID):
         try:
-            logger.info("正在查询测试订单%s" % F_ID) 
+            # logger.info("正在查询测试订单%s" % F_ID) 
             sql = f"SELECT COUNT(*) FROM TF_ORDER_TEST WHERE F_ID = :F_ID"
             result = self.executeQuery(sql, {'F_ID': F_ID})[0][0]
-            logger.info("测试订单%s查询完成" % F_ID)
+            # logger.info("测试订单%s查询完成" % F_ID)
             return result
         except Exception as e:
             logger.error("查询测试订单错误: %s" % e)
@@ -250,10 +247,10 @@ class Mapper:
     # 从TF_ORDER中删除测试订单
     def deleteTestOrder(self, F_ID):
         try:
-            logger.info("正在从TF_ORDER中删除测试订单%s" % F_ID)
+            # logger.info("正在从TF_ORDER中删除测试订单%s" % F_ID)
             sql = f"DELETE FROM TF_ORDER WHERE F_ID = :F_ID"
             self.executeNonQuery(sql, {'F_ID': F_ID})
-            logger.info("测试订单%s成功从TF_ORDER中删除" % F_ID)
+            # logger.info("测试订单%s成功从TF_ORDER中删除" % F_ID)
         except Exception as e:
             logger.error("删除测试订单错误: %s" % e)
               

@@ -51,8 +51,16 @@ class ThresholdPostModel(BaseModel):
 
 
 class TimespanQueryModel(BaseModel):
-    startts: int = Field(default=None, title="Start timestamp")
-    endts: int = Field(default=None, title="End timestamp")
+    # startts: int = Field(default=None, title="Start timestamp")
+    # endts: int = Field(default=None, title="End timestamp")
+    lessCreattimeStr: str = Field(default=None, title="Start timestamp")
+    moreCreattimeStr: str = Field(default=None, title="End timestamp")
+
+
+
+
+
+
 
 
 class SensingDataQueryModel(BaseModel):

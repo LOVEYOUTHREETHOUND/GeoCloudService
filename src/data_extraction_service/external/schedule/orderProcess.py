@@ -163,6 +163,7 @@ class OrderProcess:
                     f_id = order['F_ID']
                     count = self.mapper.getTestOrderCountByID(f_id)
                     if count > 0 :
+                        count = 0
                         logger.info("订单%s已成功插入TF_ORDER_TEST" % f_id)
                         self.mapper.deleteTestOrder(f_id)
                     

@@ -38,6 +38,7 @@ def spatial_query_blueprint(siwa, pool):
         query=SpatialQueryParam,
         resp=QueryResponse
     )
+    
     def spatial_query():
         args = request.args.to_dict(flat=False)
         query_wkt = args.get('wkt')

@@ -41,6 +41,7 @@ def gen_app():
     bp_feedback(app, siwa)
     #cmm20241023已完成订单统计优化
     bp_stat(app, siwa)
+    product_intro(app, siwa)
     # app.register_blueprint(bp_feedback)
     # app.register_blueprint(bp_stat)
     return app
@@ -295,5 +296,85 @@ def bp_stat(app, siwa):
         
 
     app.register_blueprint(bp_stat)
+
+def product_intro(app,siwa):
+    product_intro = Blueprint("productInfo", __name__, url_prefix='/productInfo')
+    # 获取所有卫星名称接口
+    @product_intro.route('/satellites', methods=['GET'])
+    @siwa.doc(
+        summary="获取所有卫星名称接口",
+        description="获取所有卫星名称接口",
+    )
+    def get_satellites():
+        try:
+            connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
+            cursor = connection.cursor()
+            cursor.execute("""
+                SELECT id, satellites_name 
+                FROM satellitesinfo
+            """)
+            satellites = []
+            for row in cursor:
+                satellites.append({
+                    'id': row[0],
+                    'name': row[1]
+                })
+            return jsonify(satellites)
+
+        except oracledb.DatabaseError as e:
+            error, = e.args
+            return jsonify({"error": str(error)}), 500
+
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+
+    # 通过卫星名获取对应卫星介绍接口
+    @product_intro.route('/satellite/name', methods=['POST'])
+    @siwa.doc(
+        summary="获取卫星介绍接口",
+        description="通过卫星名获取对应卫星介绍接口",
+    )
+    def post_satellite_by_name():
+        try:
+            data = request.get_json() 
+            name = data.get('name')  
+
+            if not name:
+                return jsonify({"error": "未获取卫星名"}), 400
+            connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
+            cursor = connection.cursor()
+            cursor.execute("""
+                SELECT id, satellites_name, image_url, description 
+                FROM satellitesinfo
+                WHERE satellites_name = :name
+            """, name=name)
+
+            row = cursor.fetchone()
+
+            if row:
+                satellite = {
+                    'id': row[0],
+                    'name': row[1],
+                    'imageUrl': row[2],
+                    'description': str(row[3]) if row[3] else None
+                }
+                return jsonify(satellite)
+            else:
+                return jsonify({'error': '未找到对应的卫星'}), 404
+
+        except oracledb.DatabaseError as e:
+            error, = e.args
+            return jsonify({"error": str(error)}), 500
+
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+
+    app.register_blueprint(product_intro)
 
 

@@ -19,6 +19,7 @@ class OrderProcess:
         self.lock = threading.Lock()
         max_workers = config.JSON_MAX_WORKERS
         self.executor = ThreadPoolExecutor(max_workers)
+        self.processed_orders = set()
 
     # 将未处理的订单名与订单数据名写入文件
     def writePendingOrderToRequire(self):
@@ -131,15 +132,15 @@ class OrderProcess:
                     id = self.mapper.getIdByOrdername(ordername)
                     self.mapper.updateDataStatusByNameAndId(orderdata, id)
                     os.remove(path + '/' + filename)
-                    count = self.mapper.getCountByOrderId(id)
-                    if(count == 0):
+                    if(self.mapper.getCountByOrderId(id)):
                         with self.lock:
-                            count = -1
-                            logger.info("订单%s状态更新中" % ordername)
-                            self.mapper.updateOrderStatusByOrdername(ordername)
-                            self.createServUUser(ordername)
-                            # self.sendEmail(ordername)  
-                            logger.info("订单%s状态更新完成" % ordername)
+                            if ordername not in self.processed_orders:
+                                self.processed_orders.add(ordername)
+                                logger.info("订单%s状态更新中" % ordername)
+                                self.mapper.updateOrderStatusByOrdername(ordername)
+                                self.createServUUser(ordername)
+                                # self.sendEmail(ordername)  
+                                logger.info("订单%s状态更新完成" % ordername)
                 except Exception as e:
                     logger.error("订单%s状态更新出错: %s" % (ordername, e))
 

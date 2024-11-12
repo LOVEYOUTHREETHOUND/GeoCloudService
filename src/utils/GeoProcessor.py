@@ -1,6 +1,4 @@
 import geopandas as gpd
-from shapely.geometry import Polygon
-import shapely
 from src.config import config
 
 
@@ -8,14 +6,6 @@ class GeoProcessor:
     def __init__(self):
         self.crs = config.CRS
    
-    def wktToShapely(self, wkt: str) -> gpd.GeoDataFrame:
-        """
-        将wkt转成Shapeley对象;
-        wkt: WKT格式的几何形状;
-        """
-        geometry = shapely.wkt.loads(wkt)
-        return geometry
-    
     def findIntersectedData(self, target_area, data_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """
         查找与目标区域相交的数据;
@@ -62,16 +52,28 @@ class GeoProcessor:
         data: GeoDataFrame;
         返回值格式：[{'dataname': 'A', 'geometry': 'POLYGON ((...))'}, {'dataname': 'B', 'geometry': 'POLYGON ((...))'}, ...]
         """
-        data_dict = data.to_dict(orient='records')
-        return data_dict
-    
+        result_list = []
+        for _, row in data.iterrows():
+            row_dict = {}
+            for key, value in row.items():
+                if key == 'geometry':
+                    row_dict[key] = value.wkt
+                else:
+                    row_dict[key] = str(value)
+            result_list.append(row_dict)
+        return result_list
+
     def GeoDataFrameToList(self, data: gpd.GeoDataFrame) -> list:
         """
         将GeoDataFrame转换为列表;
         data: GeoDataFrame;
         返回值格式：[['A', 'POLYGON ((...))'], ['B', 'POLYGON ((...))'], ...]
         """
-        data_list = data.values.tolist()
-        return data_list
- 
+        result_list = []
+        for _, row in data.iterrows():
+            wkt = row['geometry'].wkt
+            other_values = [str(value) for key, value in row.items() if key != 'geometry']
+            result_list.append(other_values + [wkt])
+        
+        return result_list
 

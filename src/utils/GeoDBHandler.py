@@ -2,34 +2,18 @@ import geopandas as gpd
 import shapely
 from src.config import config
 from src.utils.logger import logger
-
-class DBHandler:
-    def __init__(self, pool):
-        self.pool = pool
-        self.crs = config.CRS
-        
-    def ExecuteQuery(self, sql, pamars=None):
-        """
-        用以执行查询语句;
-        sql: 查询语句;
-        pamars: 查询参数;
-        返回值为除最后一列以外的所有列名,以及查询结果;
-        """
-        try:
-            with self.pool.acquire() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(sql, pamars)
-                    columns = [desc[0] for desc in cur.description[:-1]]
-                    data = cur.fetchall()
-                    return columns, data
-        except Exception as e:
-            logger.error(f"执行查询语句时出现错误: {e}, sql: {sql}, params: {pamars}")
-            return [], []
-        
         
 class GeoDBHandler:
     def __init__(self):
         self.crs = config.CRS
+        
+    def wktToShapely(self, wkt: str) -> gpd.GeoDataFrame:
+        """
+        将wkt转成Shapeley对象;
+        wkt: WKT格式的几何形状;
+        """
+        geometry = shapely.wkt.loads(wkt)
+        return geometry
         
     def dbDataToGeoDataFrame(self, rows, columns) -> gpd.GeoDataFrame:
         """
@@ -50,6 +34,38 @@ class GeoDBHandler:
         # 创建GeoDataFrame
         gdf = gpd.GeoDataFrame(attributes, columns=columns, geometry=geometries, crs=self.crs)
         return gdf
+
+    def sdoGeometryToGeoDataFrame(self, sdo_geometry, additional_columns=None, additional_data=None) -> gpd.GeoDataFrame:
+        """
+        将SDO_GEOMETRY对象以及其余可能需要的属性转换为GeoDataFrame;
+        sdo_geometry: SDO_GEOMETRY对象,一般为从数据库中读取的数据;
+        additional_columns: 其余数据的列名,如F_ID, NAME等;
+        additional_data: 其余数据;
+        注意additional_data和additional_columns的列数应该相等,且其行数与sdo_geometry的行数相等;
+        """
+        try:
+            geometries = []
+            for data in sdo_geometry:
+                geometry = self.sdoGeometryToShapely(data)
+                geometries.append(geometry)
+                
+            if additional_columns is None and additional_data is None:
+                gdf = gpd.GeoDataFrame(geometry=geometries, crs=self.crs)
+            
+            else:
+                if len(additional_columns) != len(additional_data[0]):
+                    logger.error("additional_columns和additional_data的列数不相等!")
+                    return None
+                if len(additional_data) != len(sdo_geometry):
+                    logger.error("sdo_geometry和additional_data的行数不相等!")
+                    return None
+                
+                gdf = gpd.GeoDataFrame(additional_data, columns=additional_columns, geometry=geometries, crs=self.crs)
+            return gdf
+        except Exception as e:
+            logger.error(f"将SDO_GEOMETRY对象转换为GeoDataFrame时出现错误: {e}")
+            return None
+            
     
     def sdoGeometryToShapely(self, sdo_geometry):    
         """

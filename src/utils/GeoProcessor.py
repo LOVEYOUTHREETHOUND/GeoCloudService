@@ -1,5 +1,6 @@
 import geopandas as gpd
 from src.config import config
+from shapely.geometry import Point, LineString
 
 
 class GeoProcessor:
@@ -39,7 +40,14 @@ class GeoProcessor:
             intersection = combined_data.intersection(target_area)
             
             # 计算覆盖率
-            coverage_ratio = intersection.area / target_area.area
+            coverage_ratio = 0
+            
+            if isinstance(target_area, Point):
+                coverage_ratio = 1
+            elif isinstance(target_area, LineString):
+                coverage_ratio = intersection.length / target_area.length
+            else:
+                coverage_ratio = intersection.area / target_area.area
             
             return coverage_ratio
         except Exception as e:

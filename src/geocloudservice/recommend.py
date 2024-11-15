@@ -47,7 +47,7 @@ def recommendData(tablename: list, wkt: str, areacode: str , pool) ->list:
         logger.error('wkt和areacode不能同时为空')
         return None
     dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
-                "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_DATANAME", "F_PRODUCETIME",
+                "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                 "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
     selectSql = generateSqlQuery(dataname, tablename)
     ordersql = ' ORDER BY "F_RECEIVETIME" FETCH FIRST :limit_num ROWS ONLY'
@@ -92,13 +92,13 @@ def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTim
             logger.error('wkt和areacode不能同时为空')
             return None
         dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
-                    "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_DATANAME", "F_PRODUCETIME",
+                    "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                     "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
         selectSql = generateSqlQuery(dataname, tablename)
         whereSql = ' WHERE  F_RECEIVETIME BETWEEN TO_DATE(:startTime, \'YYYY-MM-DD HH24:MI:SS\') AND TO_DATE(:endTime, \'YYYY-MM-DD HH24:MI:SS\') AND F_CLOUDPERCENT <= :cloudPercent'
-        orderSql = ' ORDER BY "F_RECEIVETIME" FETCH FIRST :limit_num ROWS ONLY'
+        orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
         sql = f'{selectSql} {whereSql} {orderSql}'
-        ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent, 'limit_num': 1000})
+        ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent})
         geodbhandler = GeoDBHandler()
         ImageGdf = geodbhandler.dbDataToGeoDataFrame(ImageInfo, columns)
         target_area = getTargetArea(geodbhandler, wkt, areacode, pool)

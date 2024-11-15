@@ -1,6 +1,6 @@
 import geopandas as gpd
 from src.config import config
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString, Polygon, box
 
 
 class GeoProcessor:
@@ -10,9 +10,10 @@ class GeoProcessor:
     def findIntersectedData(self, target_area, data_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """
         查找与目标区域相交的数据;
-        target_area: 目标区域,一般为shapely.geometry.Polygon对象;
+        target_area: 目标区域,一般为shapely.geometry对象;
         data_gdf: 数据GeoDataFrame;
-        数据要求: data_gdf中至少有一个geometry列,且该列储存的是shapely.geometry.Polygon对象;
+        数据要求: data_gdf中至少有一个geometry列,且该列储存的是shapely.geometry对象;
+        返回值: 与目标区域相交的数据GeoDataFrame;
         """
         try:
             # 检查每个几何形状是否与target_area相交
@@ -56,6 +57,20 @@ class GeoProcessor:
         except Exception as e:
             print(f"计算覆盖率时出现错误: {e}")
             return 0.0
+
+    def getEnvelope(self, data: gpd.GeoDataFrame) -> Polygon:
+        """
+        获取数据的外接矩形;
+        data: GeoDataFrame;
+        返回值: 外接矩形,一般为shapely.geometry.Polygon对象;
+        """
+        try:
+            
+            minx, miny, maxx, maxy = data.total_bounds
+            return box(minx, miny, maxx, maxy)
+        except Exception as e:
+            print(f"获取外接矩形时出现错误: {e}")
+            return None
 
     def GeoDataFrameToDict(self, data: gpd.GeoDataFrame) -> dict:
         """

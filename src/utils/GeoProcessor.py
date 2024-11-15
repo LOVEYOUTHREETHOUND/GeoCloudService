@@ -41,6 +41,9 @@ class GeoProcessor:
             
             # 计算覆盖率
             coverage_ratio = 0
+
+            if intersection.is_empty:
+                return 0.0
             
             if isinstance(target_area, Point):
                 coverage_ratio = 1

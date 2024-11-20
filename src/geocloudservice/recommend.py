@@ -49,8 +49,8 @@ def recommendData(tablename: list, wkt: str, areacode: str , pool) ->list:
     dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                 "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                 "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
-    selectSql = generateSqlQuery(dataname, tablename)
     ordersql = ' ORDER BY "F_RECEIVETIME" FETCH FIRST :limit_num ROWS ONLY'
+    selectSql = generateSqlQuery(dataname, tablename, whereSql="")
     sql = f'{selectSql} {ordersql}'
     geodbhandler = GeoDBHandler()
     geoprocessor = GeoProcessor()
@@ -94,10 +94,10 @@ def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTim
         dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                     "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                     "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
-        selectSql = generateSqlQuery(dataname, tablename)
         whereSql = ' WHERE  F_RECEIVETIME BETWEEN TO_DATE(:startTime, \'YYYY-MM-DD HH24:MI:SS\') AND TO_DATE(:endTime, \'YYYY-MM-DD HH24:MI:SS\') AND F_CLOUDPERCENT <= :cloudPercent'
         orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
-        sql = f'{selectSql} {whereSql} {orderSql}'
+        selectSql = generateSqlQuery(dataname, tablename,whereSql)
+        sql = f'{selectSql}{orderSql}'
         ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent})
         geodbhandler = GeoDBHandler()
         ImageGdf = geodbhandler.dbDataToGeoDataFrame(ImageInfo, columns)
@@ -159,7 +159,7 @@ def formatDictForView(dictList: list):
         logger.error(f'格式化字典列表失败: {e}')
         return None
 
-def generateSqlQuery(dataname: list, tablename: list) ->str:
+def generateSqlQuery(dataname: list, tablename: list, whereSql:str) ->str:
     """根据传入的表名和字段名生成查询语句
 
     Args:
@@ -174,7 +174,7 @@ def generateSqlQuery(dataname: list, tablename: list) ->str:
         for table in tablename:
             table = table.upper()
             columns = ','.join([f'"{name}"' for name in dataname])
-            tableSqlList.append(f'select {columns} FROM {table}')
+            tableSqlList.append(f'select {columns} FROM {table}{whereSql}')
         sql = ' UNION ALL '.join(tableSqlList)
         return sql
     except Exception as e:

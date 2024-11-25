@@ -12,6 +12,7 @@ from marshmallow import Schema, fields
 # from src.utils.db.oracle import create_pool
 
 from src.geocloudservice.blueprints.spatial_query_bp import spatial_query_blueprint
+from src.geocloudservice.blueprints.recommend_query_bp import search_query_blueprint, recommend_query_blueprint
 from src.geocloudservice.api_models import TimespanQueryModel
 import src.config.config_template as config
 from src.geocloudservice.blueprints.subscribe import subscribe_blueprint
@@ -28,6 +29,12 @@ def gen_app():
 
     # spatial_query_bp = spatial_query_blueprint(siwa, pool)
     # app.register_blueprint(spatial_query_bp)
+
+    recommend_query_bp = recommend_query_blueprint(app, siwa)
+    app.register_blueprint(recommend_query_bp)
+    search_query_bp = search_query_blueprint(app, siwa)
+    app.register_blueprint(search_query_bp)
+
 
     @app.post(f"/test")
     @siwa.doc(
@@ -305,6 +312,7 @@ def product_intro(app,siwa):
     @siwa.doc(
         summary="获取所有卫星名称接口",
         description="获取所有卫星名称接口",
+        tags=["productInfo"]
     )
     def get_satellites():
         try:
@@ -337,6 +345,7 @@ def product_intro(app,siwa):
     @siwa.doc(
         summary="获取卫星介绍接口",
         description="通过卫星名获取对应卫星介绍接口",
+        tags=["productInfo"]
     )
     def post_satellite_by_name():
         try:

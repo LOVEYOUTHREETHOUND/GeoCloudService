@@ -7,7 +7,7 @@ from src.utils.db.oracle import create_pool
 import src.config.config as config
 import src.utils.GeoDBHandler 
 import src.utils.GeoProcessor
-from src.geocloudservice.recommend import recommendData
+from src.geocloudservice.recommend import ProcessDueSubscriptions, recommendData
 
 import geopandas as gpd
 from shapely.geometry import Polygon
@@ -15,7 +15,7 @@ from shapely.geometry import Polygon
 
 def main():
     tablename = ["TB_META_ZY02C","TB_META_GF1"]
-    wkt = "POLYGON((108.0176 32.0361,108.0177 32.0361,108.0176 32.0362,108.0175 32.0361,108.0176 32.0361))"
+    wkt = "POLYGON ((93.2814 58.5466, 94.2746 58.4038, 93.9459 57.8909, 92.9661 58.0319, 93.2814 58.5466))"
     pool = create_pool()
-    recommendData(tablename,wkt,None,pool)
+    print(recommendData(tablename,wkt,None,pool))
         

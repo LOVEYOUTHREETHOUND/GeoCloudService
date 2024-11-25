@@ -1,5 +1,6 @@
 import oracledb
 import src.config.config as config 
+from src.utils.logger import logger
 
 # #oracledb.init_oracle_client()
 
@@ -27,4 +28,23 @@ def create_pool():
                     min=min, max=max, increment=increment)
     return pool
 
-# # Mypool = create_pool()
+def executeQuery(pool: oracledb.ConnectionPool, sql: str, params = None):
+    try:
+        with pool.acquire() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                res = cur.fetchall()
+        return res
+    except Exception as e:
+        logger.error(f'执行SQL语句失败: {e}, sql: {sql}, params: {params}')
+        return None
+    
+def executeNonQuery(pool: oracledb.ConnectionPool, sql: str, params = None):
+    try:
+        with pool.acquire() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                conn.commit()   
+    except Exception as e:
+        logger.error(f'执行SQL语句失败: {e}, sql: {sql}, params: {params}')
+ 

@@ -14,6 +14,7 @@ from marshmallow import Schema, fields
 from src.geocloudservice.blueprints.spatial_query_bp import spatial_query_blueprint
 from src.geocloudservice.api_models import TimespanQueryModel
 import src.config.config_template as config
+from src.geocloudservice.blueprints.subscribe import subscribe_blueprint
 
 
 
@@ -376,5 +377,6 @@ def product_intro(app,siwa):
                 connection.close()
 
     app.register_blueprint(product_intro)
+    app.register_blueprint(subscribe_blueprint(app, siwa))
 
 

@@ -120,6 +120,10 @@ class OrderProcess:
             logger.info("正在更新订单状态")
             path = config.JSON_READ_PATH
             filelist = os.listdir(path)
+
+            def allOrderdataIsReady(id):
+                count = self.mapper.getCountByOrderId(id)
+                return count == 0
             
             def process_file(filename):
                 try:
@@ -132,7 +136,7 @@ class OrderProcess:
                     id = self.mapper.getIdByOrdername(ordername)
                     self.mapper.updateDataStatusByNameAndId(orderdata, id)
                     os.remove(path + '/' + filename)
-                    if(self.mapper.getCountByOrderId(id)):
+                    if(allOrderdataIsReady(id)):
                         with self.lock:
                             if ordername not in self.processed_orders:
                                 self.processed_orders.add(ordername)

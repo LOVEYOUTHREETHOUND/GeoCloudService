@@ -24,10 +24,6 @@ class SubscribeRequest(BaseModel):
     wkt: str = Field(..., description="WKT格式区域")
     isWkt: str = Field(..., description="是否WKT格式")
     nodeName: str = Field(..., description="数据库表名列表")
-    # cloudPercent: float = Field(..., description="云量")
-    # subTime: str = Field(..., description="订阅时间")
-    # subStartTime: str = Field(..., description="订阅开始时间")
-    # subEndTime: str = Field(..., description="订阅结束时间")
     tables: Optional[List[Table]] = None
     
 def formatTime(time: str) -> str:
@@ -101,22 +97,9 @@ def subscribe_blueprint(app: Flask, siwa: SiwaDoc) -> Blueprint:
         json_data = request.get_json()
         query = SubscribeRequest(**json_data)
         
-        # 提取参数
-        # userId = int(query.userId)
-        # areaCode = query.areaCode
-        # wkt = query.wkt
-        # isWKT = query.isWkt
-        # nodeNames = query.nodeName
-        # tables = query.tables
-        # cloudPercent = query.cloudPercent
-        # subTime = query.subTime
-        # subStartTime = query.subStartTime
-        # subEndTime = query.subEndTime
         userId, areaCode, wkt, isWKT, nodeNames, cloudPercent, subStartTime, subEndTime = validateSubscribeRequest(query)
 
         subTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # print(tables)
-        # return({"data": {}, "decryptFlag": "false", "status": 200, "version": "v0.1.0-alpha1"})
         
         # 处理参数使之合法
         if(isWKT):

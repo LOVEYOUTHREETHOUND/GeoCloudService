@@ -1,10 +1,12 @@
+from datetime import datetime
 from src.utils.GeoProcessor import GeoProcessor
 from src.utils.GeoDBHandler import GeoDBHandler
 from src.utils.logger import logger
 from concurrent.futures import ThreadPoolExecutor
 from src.utils.Email import send_email
+from src.utils.IdMaker import getPkId
 from src.utils.db.oracle import executeNonQuery, executeQuery
-from src.config.config import satelliteToNodeId
+from src.config.config import satelliteToNodeId, NodeIdToNodeName
 
 def fetchDataFromDB(pool, sql:str ,param=None):
     """从数据库中获取数据和字段名"""
@@ -194,7 +196,7 @@ def ProcessDueSubscriptions(pool):
         sql = selectSql
         data = executeQuery(pool, sql)
         
-        def processASubscription(sub):
+        for sub in data:
             IsWKT = sub[3]
             if(IsWKT == 1):
                 wkt = sub[9]
@@ -209,15 +211,85 @@ def ProcessDueSubscriptions(pool):
             endTime = str(sub[8])
             cloudPercent = sub[5]
             logger.info(f'startTime: {startTime}, endTime: {endTime}, cloudPercent: {cloudPercent}')
-            datanames = querySubscribedData(tablenames, wkt, areacode, startTime, endTime, cloudPercent, userid, pool)
+            # datanames = querySubscribedData(tablenames, wkt, areacode, startTime, endTime, cloudPercent, userid, pool)
+            dataInfos = searchData(tablenames, wkt, areacode, startTime, endTime, cloudPercent, pool)
+            datanames = [data['F_DATANAME'] for data in dataInfos]
             sendEmailToUser(userid, datanames, pool)
+            addDataToShop(dataInfos, userid, pool)
             updateSubOrderStatus(pool, subid)
-        executor = ThreadPoolExecutor()
-        executor.map(processASubscription, data)
         
     except Exception as e:
         logger.error(f'处理过期订阅失败: {e}')
         return None
+
+def addDataToShop(dataInfos: list, userid, pool):
+    """将数据添加到购物车"""
+    sql = "INSERT INTO TF_SHOP ( \
+            F_ID, F_USERID, F_DATANAME, F_SATELITE, F_SENSOR, \
+            F_RECEIVETIME, F_DATASIZE, F_FAVORITETIME, F_DATASOURCE, \
+            F_DATAPATH, F_DATATYPE, F_NODEID, F_DATAID, F_DOCNUM, \
+            F_TM, F_DATATYPENAME, F_PRODUCTLEVEL, F_IMAGEURL, \
+            F_WKTRESPONSE, F_NODENAME, F_DOCNUM_OLD, F_CLOUDPERCENT, \
+            F_LOCATION, F_SGTABLENAME, F_DID, F_ORBITID, F_SCENEPATH, \
+            F_SCENEROW, F_SYSTEMTYPE\
+        ) VALUES ( \
+            :F_ID, :F_USERID, :F_DATANAME, :F_SATELITE, :F_SENSOR, \
+            TO_DATE(:F_RECEIVETIME, 'YYYY-MM-DD HH24:MI:SS'), :F_DATASIZE, \
+            TO_DATE(:F_FAVORITETIME, 'YYYY-MM-DD HH24:MI:SS'), :F_DATASOURCE, \
+            :F_DATAPATH, :F_DATATYPE, :F_NODEID, :F_DATAID, :F_DOCNUM, \
+            :F_TM, :F_DATATYPENAME, :F_PRODUCTLEVEL, :F_IMAGEURL, \
+            :F_WKTRESPONSE, :F_NODENAME, :F_DOCNUM_OLD, :F_CLOUDPERCENT, \
+            :F_LOCATION, :F_SGTABLENAME, :F_DID, :F_ORBITID, :F_SCENEPATH, \
+            :F_SCENEROW, :F_SYSTEMTYPE) "
+
+    def addSingleDataToShop(dataInfo, userid):
+        try:
+            params = {}
+            params['F_ID'] = getPkId()
+            params['F_USERID'] = int(userid)
+            params['F_DATANAME'] = dataInfo['F_DATANAME']
+            params['F_SATELITE'] = dataInfo['F_SATELLITEID']
+            params['F_SENSOR'] = dataInfo['F_SENSORID']
+            params['F_RECEIVETIME'] = dataInfo['F_RECEIVETIME']
+            params['F_DATASIZE'] = float(dataInfo['F_DATASIZE'])
+            params['F_FAVORITETIME'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            params['F_DATASOURCE'] = None
+            params['F_DATAPATH'] = None
+            params['F_DATATYPE'] = 0
+            params['F_NODEID'] = dataInfo['NODEID']
+            params['F_DATAID'] = dataInfo['F_DATAID']
+            params['F_DOCNUM'] = None
+            params['F_TM'] = None
+            params['F_DATATYPENAME'] = dataInfo['F_DATATYPENAME']
+            params['F_PRODUCTLEVEL'] = dataInfo['F_PRODUCTLEVEL']
+            params['F_IMAGEURL'] = '/mj/metaImage/getImageByTypeForAll?typeId=2&dataId={}&nodeId={}'.format(dataInfo['F_DID'],dataInfo['NODEID'])
+            params['F_WKTRESPONSE'] = dataInfo['WKTRESPONSE']
+            params['F_NODENAME'] = NodeIdToNodeName[dataInfo['NODEID']]
+            params['F_DOCNUM_OLD'] = None
+            params['F_CLOUDPERCENT'] = float(dataInfo['F_CLOUDPERCENT'])
+            params['F_LOCATION'] = dataInfo['F_LOCATION']
+            params['F_SGTABLENAME'] = dataInfo['F_TABLENAME']
+            params['F_DID'] = int(dataInfo['F_DID'])
+            # print(dataInfo['F_ORBITID'])
+            # if dataInfo['F_ORBITID'] is not None:
+            #     params['F_ORBITID'] = int(dataInfo['F_ORBITID'])
+            # else:
+            #     params['F_ORBITID'] = None
+            # params['F_ORBITID'] = int(dataInfo['F_ORBITID']) if dataInfo['F_ORBITID'] is not None else None
+            # params['f_ORBITID'] = dataInfo['F_ORBITID']
+            params['F_ORBITID'] = None if dataInfo['F_ORBITID'] == 'None' else int(dataInfo['F_ORBITID'])
+            params['F_SCENEPATH'] = dataInfo['F_SCENEPATH']
+            params['F_SCENEROW'] = dataInfo['F_SCENEROW']
+            params['F_SYSTEMTYPE'] = None
+            executeNonQuery(pool, sql, params)
+        except Exception as e:
+            logger.error('添加数据到购物车失败: {}, 错误数据: {}, userid: {}'.format(e, dataInfo, userid))
+    
+    executor = ThreadPoolExecutor()
+    executor.map(addSingleDataToShop, dataInfos, [userid]*len(dataInfos))
+   
+        
+        
        
 def getShapelyAreaByCode(areacode: str, pool): 
     """根据传入的行政区划代码获取行政区划的几何形状
@@ -266,7 +338,7 @@ def formatDictForView(dictList: list):
         logger.error(f'格式化字典列表失败: {e}')
         return None
 
-def generateSqlQuery(dataname: list, tablename: list, wheresql: str = None) ->str:
+def generateSqlQuery(dataname: list, tablename: list, wheresql: str = None) -> str:
     """根据传入的表名和字段名生成查询语句
 
     Args:

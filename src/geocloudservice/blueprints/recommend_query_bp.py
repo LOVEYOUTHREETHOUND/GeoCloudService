@@ -6,7 +6,8 @@ from typing import List, Optional, Tuple, Dict, Any, Union
 from marshmallow import ValidationError
 
 from src.utils.db.oracle import create_pool
-from src.geocloudservice.recommend import recommendData, searchData
+from src.geocloudservice.recommend import recommendData, searchData, recommendCoverData
+
 
 def rz_app():
     app = Flask(__name__,)
@@ -118,6 +119,26 @@ class QueryResponse(BaseModel):
     status: int = Field(...) 
     version: str = Field(...)
 
+class totalQueryTable(BaseModel):
+    TOTAL: float = Field(..., title="合并数据的面积")
+    RN: int = Field(..., title="行号")
+    SIZENUM: int = Field(..., title="推荐数据的条数")
+    WKTRESPONSE: str = Field(..., title="合并数据的WKT格式")
+
+class totalQueryData(BaseModel):
+    total: int = Field(...,title="")
+    guid: str = Field(...,title="全局唯一标识符")
+    pageList: List[totalQueryTable] = Field(...,title="合并面的返回结果")
+
+class totalQueryResponse(BaseModel):
+    #total: int = Field(...,title="数据条数")
+    #guid: str = Field(...,title="全局统一标识符")
+    #pageList: list[totalQueryTable] = Field(...,title="合并面返回的结果")
+    data: totalQueryData = Field(...,title="")
+    decryptFlag:bool = Field(...,title="数据加密情况") 
+    status: int = Field(...) 
+    version: str = Field(...)
+    
 
 def recommend_query_blueprint(app, siwa):
     recommend_query_bp = Blueprint('recommend_query_bp', __name__, url_prefix='/recommend_query')
@@ -153,7 +174,12 @@ def recommend_query_blueprint(app, siwa):
                 wkt = None
         table_name = query.nodeName.split(',')
         pool = create_pool()
+        
+        pageSize = query.pageSize
+        page = query.currentPage
 
+        recommend_data , coverage_ratio = recommendData(table_name, wkt, area_code, pool, page, pageSize)
+        
         recommend_data , coverage_ratio = recommendData(table_name, wkt, area_code, pool)
 
         print(coverage_ratio)
@@ -163,6 +189,52 @@ def recommend_query_blueprint(app, siwa):
             guid=str(query.guid),  
             pageList=recommend_data,  
             coverage=coverage_ratio,
+            decryptFlag=False,  
+            status=200,  
+            version="1.0"  
+        )
+        return query_response.dict()
+
+    @recommend_query_bp.post('/recommend_merge')
+    @siwa.doc(
+        description='空间查询全覆盖面接口，用于"一键推荐"结果的合并',
+        summary="空间查询管覆盖面接口",
+        body=QueryBody,
+        resp=totalQueryResponse
+    )
+    def recommend_query_coverage():
+        json_data = request.get_json()
+
+        query = QueryBody(**json_data)
+
+        try:
+            query = QueryBody(**json_data)
+        except ValidationError as e:
+            return {"error": e.errors()}, 400
+
+        area_code = query.areaCode
+        wkt = query.wkt
+        if area_code == "" and wkt == "":
+            return "请检查区域设置信息" 
+        else:
+            if area_code == "":
+                area_code = None
+            if wkt == "":
+                wkt = None
+        table_name = query.nodeName.split(',')
+
+        pool = create_pool()
+        recommend_coverage = recommendCoverData(table_name, wkt ,area_code, pool)
+        
+        data = totalQueryData(
+            total = 1,
+            guid = query.guid,
+            pageList = [recommend_coverage]
+        )
+
+        query_response = totalQueryResponse(
+            data = data,  
+            total = 0,
             decryptFlag=False,  
             status=200,  
             version="1.0"  

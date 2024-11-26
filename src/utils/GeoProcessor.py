@@ -103,3 +103,25 @@ class GeoProcessor:
         
         return result_list
 
+    def calculateMergedArea(self, data_gdf: gpd.GeoDataFrame) -> dict:
+        """
+        计算数据的合并面及其总面积。
+        Args:
+            data_gdf (GeoDataFrame): 包含几何数据的GeoDataFrame。
+        Returns:
+            dict: 合并面WKT和总面积
+        """
+        try:
+            # 合并所有几何形状
+            combined_data = data_gdf['geometry'].unary_union
+
+            # 计算总面积
+            total_area = combined_data.area
+
+            # 返回合并面和面积
+            return combined_data.wkt, total_area
+        except Exception as e:
+            print(f"计算合并面及其面积时出现错误: {e}")
+            return {
+                "error": f"计算合并面及其面积时出现错误：{e}"
+            }

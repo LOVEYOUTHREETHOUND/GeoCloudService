@@ -28,7 +28,8 @@ def getTargetArea(geodbhandler: GeoDBHandler, wkt: str, areaCode: str, pool):
         logger.error(f'获取目标区域失败: {e}')
         return None
 
-def recommendData(tablename: list, wkt: str, areacode: str , pool) ->list:
+# def recommendData(tablename: list, wkt: str, areacode: str , pool) ->list:
+def recommendData(tablename: list, wkt: str, areacode: str , pool, page: int, pagesize: int = 30) ->list:
     """一键推荐功能具体实现
 
     Args:
@@ -68,10 +69,69 @@ def recommendData(tablename: list, wkt: str, areacode: str , pool) ->list:
             n += 1
         result = geoprocessor.GeoDataFrameToDict(intersected_data)
         formatted_result = formatDictForView(result)
-        return formatted_result, coverage_ratio
+        start_index = (page - 1) * pagesize
+        end_index = start_index + pagesize
+        selected_result = formatted_result[start_index:end_index]
+        return selected_result, coverage_ratio
     except Exception as e:
         logger.error(f'推荐数据失败: {e}')
         return None
+
+def recommendCoverData(tablename: list, wkt: str, areacode: str , pool) ->dict:
+    """一键推荐功能具体实现
+
+    Args:
+        tablename (list): 需要查询的表名列表(与卫星绑定)
+        wkt (str): 检索区域的wkt
+        areacode (str): 检索区域的行政区划代码
+        pool (_type_): 数据库连接池
+        areacode和wkt能且只能有一个不为空
+
+    Returns:
+        字典列表, 每一条字典代表一条数据
+        覆盖率
+    """
+    
+    if wkt is None and areacode is None:
+        logger.error('wkt和areacode不能同时为空')
+        return None
+    dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
+                "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
+                "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
+    ordersql = ' ORDER BY "F_RECEIVETIME" FETCH FIRST :limit_num ROWS ONLY'
+    selectSql = generateSqlQuery(dataname, tablename, whereSql="")
+    sql = f'{selectSql} {ordersql}'
+    geodbhandler = GeoDBHandler()
+    geoprocessor = GeoProcessor()
+    coverage_ratio = 0
+    n = 1
+    try:
+        while coverage_ratio < 0.9 and n < 9:
+            limit_num = 10000 * n
+            data, columns = fetchDataFromDB(pool, sql, {'limit_num': limit_num})
+            data_gdf = geodbhandler.dbDataToGeoDataFrame(data, columns)
+            #combine_wkt, total_area = geoprocessor.calculateMergedArea(data_gdf)
+            target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
+            intersected_data = geoprocessor.findIntersectedData(target_area, data_gdf)
+            coverage_ratio = geoprocessor.calCoverageRatio(target_area, intersected_data)
+            #print(combine_wkt)
+            
+            print(coverage_ratio)
+            n +=1
+        sizenum = len(intersected_data)
+        
+        combine_wkt, total_area = geoprocessor.calculateMergedArea(intersected_data)
+        print(combine_wkt)
+        return {
+            "SIZENUM": sizenum,
+            "WKTRESPONSE": combine_wkt,
+            "TOTAL": total_area,
+            "RN": 1
+        }
+    except Exception as e:
+        logger.error(f'推荐数据合并失败: {e}')
+        return None
+
 
 def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTime: str, cloudPercent: str, pool) ->list:
     """检索功能具体实现

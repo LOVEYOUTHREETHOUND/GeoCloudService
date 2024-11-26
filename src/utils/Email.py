@@ -1,6 +1,7 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from src.utils.logger import logger
 # from src.config.email_config import emailconfig
 import src.config.config as config
 
@@ -31,5 +32,4 @@ def send_email(subject, message,to_email):
         # 关闭SMTP连接
         server.quit()
     except Exception as e:
-        print(e)
-        print("邮件发送失败")
+        logger.error(f'邮件发送失败: {e}')

@@ -56,19 +56,21 @@ def recommendData(tablename: list, wkt: str, areacode: str , pool) ->list:
     dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                 "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                 "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
-    selectSql = generateSqlQuery(dataname, tablename)
+    whereSql = "WHERE F_TOPLEFTLATITUDE <= :maxlat AND F_TOPLEFTLONGITUDE >= :minlon AND F_BOTTOMRIGHTLATITUDE >= :minlat AND F_BOTTOMRIGHTLONGITUDE <= :maxlon"
+    selectSql = generateSqlQuery(dataname, tablename, whereSql)
     ordersql = ' ORDER BY "F_RECEIVETIME" DESC FETCH FIRST :limit_num ROWS ONLY'
     sql = f'{selectSql} {ordersql}'
     geodbhandler = GeoDBHandler()
     geoprocessor = GeoProcessor()
+    target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
+    (minlon, maxlon, minlat, maxlat) = geoprocessor.getCoordinateRange(target_area)
     coverage_ratio = 0
     n = 1
     try:
         while coverage_ratio < 0.9 and n < 9:
             limit_num = 10000 * n
-            data, columns = fetchDataFromDB(pool, sql, {'limit_num': limit_num})
+            data, columns = fetchDataFromDB(pool, sql, {'limit_num': limit_num, 'minlon': minlon, 'maxlon': maxlon, 'minlat': minlat, 'maxlat': maxlat})
             data_gdf = geodbhandler.dbDataToGeoDataFrame(data, columns)
-            target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
             intersected_data = geoprocessor.findIntersectedData(target_area, data_gdf)
             coverage_ratio = geoprocessor.calCoverageRatio(target_area, intersected_data)
             n += 1
@@ -100,15 +102,16 @@ def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTim
         dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                     "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                     "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
-        whereSql = ' WHERE  F_RECEIVETIME BETWEEN TO_DATE(:startTime, \'YYYY-MM-DD HH24:MI:SS\') AND TO_DATE(:endTime, \'YYYY-MM-DD HH24:MI:SS\') AND F_CLOUDPERCENT <= :cloudPercent'
+        whereSql = " WHERE  F_RECEIVETIME BETWEEN TO_DATE(:startTime, \'YYYY-MM-DD HH24:MI:SS\') AND TO_DATE(:endTime, \'YYYY-MM-DD HH24:MI:SS\') AND F_CLOUDPERCENT <= :cloudPercent"
         selectSql = generateSqlQuery(dataname, tablename, whereSql)
         orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
         sql = f'{selectSql} {orderSql}'
+        target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
+        geoprocessor = GeoProcessor()
+        # (minlon, maxlon, minlat, maxlat) = geoprocessor.getCoordinateRange(target_area)
         ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent})
         geodbhandler = GeoDBHandler()
         ImageGdf = geodbhandler.dbDataToGeoDataFrame(ImageInfo, columns)
-        target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
-        geoprocessor = GeoProcessor()
         intersected_data = geoprocessor.findIntersectedData(target_area, ImageGdf)
         result = geoprocessor.GeoDataFrameToDict(intersected_data)
         formatted_result = formatDictForView(result)
@@ -270,13 +273,6 @@ def addDataToShop(dataInfos: list, userid, pool):
             params['F_LOCATION'] = dataInfo['F_LOCATION']
             params['F_SGTABLENAME'] = dataInfo['F_TABLENAME']
             params['F_DID'] = int(dataInfo['F_DID'])
-            # print(dataInfo['F_ORBITID'])
-            # if dataInfo['F_ORBITID'] is not None:
-            #     params['F_ORBITID'] = int(dataInfo['F_ORBITID'])
-            # else:
-            #     params['F_ORBITID'] = None
-            # params['F_ORBITID'] = int(dataInfo['F_ORBITID']) if dataInfo['F_ORBITID'] is not None else None
-            # params['f_ORBITID'] = dataInfo['F_ORBITID']
             params['F_ORBITID'] = None if dataInfo['F_ORBITID'] == 'None' else int(dataInfo['F_ORBITID'])
             params['F_SCENEPATH'] = dataInfo['F_SCENEPATH']
             params['F_SCENEROW'] = dataInfo['F_SCENEROW']

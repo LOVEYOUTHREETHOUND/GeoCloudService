@@ -1,7 +1,7 @@
 import geopandas as gpd
 from src.config import config
 from shapely.geometry import Point, LineString, Polygon, box
-
+from src.utils.logger import logger
 
 class GeoProcessor:
     def __init__(self):
@@ -23,7 +23,7 @@ class GeoProcessor:
             intersecting_data_gdf = data_gdf[intersects].copy()
             return intersecting_data_gdf
         except Exception as e:
-            print(f"检查相交数据时出现错误: {e}")
+            logger.error(f"检查相交数据时出现错误: {e}")
             return gpd.GeoDataFrame()
         
     def calCoverageRatio(self,target_area, data_gdf: gpd.GeoDataFrame) -> float:
@@ -55,7 +55,7 @@ class GeoProcessor:
             
             return coverage_ratio
         except Exception as e:
-            print(f"计算覆盖率时出现错误: {e}")
+            logger.error(f"计算覆盖率时出现错误: {e}")
             return 0.0
 
     def getEnvelope(self, data: gpd.GeoDataFrame) -> Polygon:
@@ -69,7 +69,20 @@ class GeoProcessor:
             minx, miny, maxx, maxy = data.total_bounds
             return box(minx, miny, maxx, maxy)
         except Exception as e:
-            print(f"获取外接矩形时出现错误: {e}")
+            logger.error(f"获取外接矩形时出现错误: {e}")
+            return None
+        
+    def getCoordinateRange(self, geom) -> tuple:
+        """
+        获取几何形状的坐标范围;
+        geom: shapely.geometry对象;
+        返回值: (minx, maxx, miny, maxy);
+        """
+        try:
+            minx, miny, maxx, maxy = geom.bounds
+            return (minx, maxx, miny, maxy)
+        except Exception as e:
+            logger.error(f"获取坐标范围时出现错误: {e}")
             return None
 
     def GeoDataFrameToDict(self, data: gpd.GeoDataFrame) -> dict:

@@ -19,10 +19,10 @@ class Table(BaseModel):
 
 
 class SubscribeRequest(BaseModel):
-    userId: str = Field(..., description="用户ID")
+    LoginName: str = Field(..., description="登录名")
     areaCode: str = Field(..., description="区域编码")
     wkt: str = Field(..., description="WKT格式区域")
-    isWkt: str = Field(..., description="是否WKT格式")
+    isNoWkt: str = Field(..., description="是否WKT格式")
     nodeName: str = Field(..., description="数据库表名列表")
     tables: Optional[List[Table]] = None
     
@@ -53,6 +53,16 @@ def generateSubID(pool) -> str:
     subID = f"{currentDate}DY{formatSequence}"
     return subID
 
+def getUserIdByLoginName(pool, loginName: str) -> str:
+    sql = "select F_ID from TC_SYS_USER where F_LOGINNAME = :loginName"
+    parames = {'loginName': loginName}
+    userId = executeQuery(pool, sql, parames)
+    if len(userId) == 0:
+        raise Exception("登录名错误，此用户不存在")
+    else:
+        return userId[0][0]
+
+
 def insertSubscribe(pool, subID: str, userId: str, areaCode: str, wkt: str, isWKT: str, nodeNames: str, cloudPercent: float, subTime: str, subStartTime: str, subEndTime: str, status: str) -> bool:
     sql = "insert into SUBSCRIBE_ORDER(SUBID, USERID, AREACODE, WKT, ISWKT, NODENAMES, CLOUDPERCENT, SUBTIME, SUBSTARTTIME, SUBENDTIME, STATUS)\
         values(:subID, :userId, :areaCode, :wkt, :isWKT, :nodeNames, :cloudPercent, \
@@ -63,17 +73,20 @@ def insertSubscribe(pool, subID: str, userId: str, areaCode: str, wkt: str, isWK
                'subStartTime': subStartTime, 'subEndTime': subEndTime, 'status': status}
     executeNonQuery(pool, sql, parames)
  
-def validateSubscribeRequest(request: SubscribeRequest):
-        userId = int(request.userId)
+def validateSubscribeRequest(request: SubscribeRequest, pool):
+        LoginName = request.LoginName
+        userId = getUserIdByLoginName(pool, LoginName)
+        
         areaCode = request.areaCode
         wkt = request.wkt
-        isWKT = request.isWkt
-        if isWKT:
-            areaCode = None
+        if areaCode == "" and wkt == "":
+            raise Exception("areaCode和WKT不能同时为空")
+        elif areaCode == "":
             isWKT = 1
-        else:
-            wkt = None
+            areaCode = None
+        elif wkt == "":
             isWKT = 0
+            wkt = None
         nodeNames = request.nodeName
         tables = request.tables  
         for table in tables:
@@ -92,20 +105,15 @@ def subscribe_blueprint(app: Flask, siwa: SiwaDoc) -> Blueprint:
         description="订阅功能接口",   
         body=SubscribeRequest
     )
-    @subscribe.route("/subscribe", methods=["POST"])
+    @subscribe.route("/agrsQueryModuleSpatial/sendSubscribeRequest", methods=["POST"])
     def subscribeService():
         json_data = request.get_json()
         query = SubscribeRequest(**json_data)
         
-        userId, areaCode, wkt, isWKT, nodeNames, cloudPercent, subStartTime, subEndTime = validateSubscribeRequest(query)
+        pool = create_pool()
+        userId, areaCode, wkt, isWKT, nodeNames, cloudPercent, subStartTime, subEndTime = validateSubscribeRequest(query,pool)
 
         subTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 处理参数使之合法
-        if(isWKT):
-            areaCode = None
-        else:
-            wkt = None
         
         # 时间格式转化
         subTime = formatTime(subTime)
@@ -113,7 +121,6 @@ def subscribe_blueprint(app: Flask, siwa: SiwaDoc) -> Blueprint:
         subEndTime = formatTime(subEndTime)
         
         # 生成订阅ID
-        pool = create_pool()
         subID = generateSubID(pool)
         
         # 插入订阅信息

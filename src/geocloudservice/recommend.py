@@ -17,7 +17,6 @@ def fetchDataFromDB(pool, sql:str ,param=None):
                 # 默认最后一个字段名是几何字段，舍弃
                 columns = [desc[0] for desc in cur.description[:-1]]
                 data = cur.fetchall()
-                # logger.info(f'sql: {sql}, param: {param}, data: {data}')
         return data, columns
     except Exception as e:
         logger.error(f'从数据库中获取数据失败: {e}, sql: {sql}, param: {param}')
@@ -108,7 +107,6 @@ def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTim
         sql = f'{selectSql} {orderSql}'
         target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
         geoprocessor = GeoProcessor()
-        # (minlon, maxlon, minlat, maxlat) = geoprocessor.getCoordinateRange(target_area)
         ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent})
         geodbhandler = GeoDBHandler()
         ImageGdf = geodbhandler.dbDataToGeoDataFrame(ImageInfo, columns)
@@ -143,9 +141,7 @@ def querySubscribedData(tablename: list, wkt: str, areacode: str, startTime: str
         selectSql = generateSqlQuery(dataname, tablename, whereSql)
         orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
         sql = f'{selectSql} {orderSql}'
-        print(sql)
         ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent})
-        print(ImageInfo)
         geodbhandler = GeoDBHandler()
         ImageGdf = geodbhandler.dbDataToGeoDataFrame(ImageInfo, columns)
         target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
@@ -328,6 +324,7 @@ def formatDictForView(dictList: list):
                 logger.error(f"获取NODEID失败, 不识别的卫星名或传感器名: {e}")
 
             newDict['RN'] = index + 1
+            newDict['NODENAME'] = NodeIdToNodeName[newDict['NODEID']]
             res.append(newDict)
         return res
     except Exception as e:

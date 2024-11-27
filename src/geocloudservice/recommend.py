@@ -68,7 +68,7 @@ def recommendData(tablename: list, wkt: str, areacode: str , pool, page: int, pa
     n = 1
     try:
         while coverage_ratio < 0.9 and n < 9:
-            limit_num = 10000 * n
+            limit_num = 100 * n
             data, columns = fetchDataFromDB(pool, sql, {'limit_num': limit_num, 'minlon': minlon, 'maxlon': maxlon, 'minlat': minlat, 'maxlat': maxlat})
             data_gdf = geodbhandler.dbDataToGeoDataFrame(data, columns)
             intersected_data = geoprocessor.findIntersectedData(target_area, data_gdf)
@@ -105,26 +105,24 @@ def recommendCoverData(tablename: list, wkt: str, areacode: str , pool) ->dict:
     dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                 "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                 "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
-    ordersql = ' ORDER BY "F_RECEIVETIME" FETCH FIRST :limit_num ROWS ONLY'
-    selectSql = generateSqlQuery(dataname, tablename, whereSql="")
+    whereSql = "WHERE F_TOPLEFTLATITUDE <= :maxlat AND F_TOPLEFTLONGITUDE >= :minlon AND F_BOTTOMRIGHTLATITUDE >= :minlat AND F_BOTTOMRIGHTLONGITUDE <= :maxlon"
+    selectSql = generateSqlQuery(dataname, tablename, whereSql)
+    ordersql = ' ORDER BY "F_RECEIVETIME" DESC FETCH FIRST :limit_num ROWS ONLY'
     sql = f'{selectSql} {ordersql}'
     geodbhandler = GeoDBHandler()
     geoprocessor = GeoProcessor()
+    target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
+    (minlon, maxlon, minlat, maxlat) = geoprocessor.getCoordinateRange(target_area)
     coverage_ratio = 0
     n = 1
     try:
         while coverage_ratio < 0.9 and n < 9:
-            limit_num = 10000 * n
-            data, columns = fetchDataFromDB(pool, sql, {'limit_num': limit_num})
+            limit_num = 100 * n
+            data, columns = fetchDataFromDB(pool, sql, {'limit_num': limit_num, 'minlon': minlon, 'maxlon': maxlon, 'minlat': minlat, 'maxlat': maxlat})
             data_gdf = geodbhandler.dbDataToGeoDataFrame(data, columns)
-            #combine_wkt, total_area = geoprocessor.calculateMergedArea(data_gdf)
-            target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
             intersected_data = geoprocessor.findIntersectedData(target_area, data_gdf)
             coverage_ratio = geoprocessor.calCoverageRatio(target_area, intersected_data)
-            #print(combine_wkt)
-            
-            print(coverage_ratio)
-            n +=1
+            n += 1
         sizenum = len(intersected_data)
         
         combine_wkt, total_area = geoprocessor.calculateMergedArea(intersected_data)

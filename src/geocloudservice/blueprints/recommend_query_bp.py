@@ -92,11 +92,12 @@ class QueryParam(BaseModel):
     F_LOCATION: float = Field(..., title="位置")
     F_PRODUCTID: int = Field(..., title="产品序列号")
     F_PRODUCTLEVEL: str = Field(..., title="产品级别")
+    NODENAME: str = Field(...,title="卫星节点")
     F_CLOUDPERCENT: str = Field(...,title="云量")
     F_TABLENAME: str = Field(..., title="表名")
     F_DATATYPENAME: str = Field(..., title="产品类型")
     F_ORBITID: int = Field(..., title="轨道号")
-    # NODEID: str = Field(..., title="卫星ID")
+    NODEID: str = Field(..., title="卫星ID")
     F_DATANAME: str = Field(..., title="卫星节点名称")
     WKTRESPONSE: str = Field(..., title="经纬度信息")
     F_PRODUCETIME: str = Field(..., title="入库时间")
@@ -179,8 +180,6 @@ def recommend_query_blueprint(app, siwa):
         page = query.currentPage
 
         recommend_data , coverage_ratio = recommendData(table_name, wkt, area_code, pool, page, pageSize)
-        
-        recommend_data , coverage_ratio = recommendData(table_name, wkt, area_code, pool)
 
         print(coverage_ratio)
 
@@ -225,9 +224,9 @@ def recommend_query_blueprint(app, siwa):
 
         pool = create_pool()
         recommend_coverage = recommendCoverData(table_name, wkt ,area_code, pool)
-        
+        sizenum = recommend_coverage.get("SIZENUM",0)
         data = totalQueryData(
-            total = 1,
+            total = sizenum,
             guid = query.guid,
             pageList = [recommend_coverage]
         )

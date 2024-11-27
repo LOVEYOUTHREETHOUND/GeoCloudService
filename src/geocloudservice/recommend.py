@@ -1,10 +1,12 @@
+from datetime import datetime
 from src.utils.GeoProcessor import GeoProcessor
 from src.utils.GeoDBHandler import GeoDBHandler
 from src.utils.logger import logger
 from concurrent.futures import ThreadPoolExecutor
 from src.utils.Email import send_email
+from src.utils.IdMaker import getPkId
 from src.utils.db.oracle import executeNonQuery, executeQuery
-from src.config.config import satelliteToNodeId
+from src.config.config import satelliteToNodeId, NodeIdToNodeName
 
 def fetchDataFromDB(pool, sql:str ,param=None):
     """从数据库中获取数据和字段名"""
@@ -15,7 +17,6 @@ def fetchDataFromDB(pool, sql:str ,param=None):
                 # 默认最后一个字段名是几何字段，舍弃
                 columns = [desc[0] for desc in cur.description[:-1]]
                 data = cur.fetchall()
-                # logger.info(f'sql: {sql}, param: {param}, data: {data}')
         return data, columns
     except Exception as e:
         logger.error(f'从数据库中获取数据失败: {e}, sql: {sql}, param: {param}')
@@ -55,19 +56,21 @@ def recommendData(tablename: list, wkt: str, areacode: str , pool, page: int, pa
     dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                 "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                 "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
-    selectSql = generateSqlQuery(dataname, tablename)
+    whereSql = "WHERE F_TOPLEFTLATITUDE <= :maxlat AND F_TOPLEFTLONGITUDE >= :minlon AND F_BOTTOMRIGHTLATITUDE >= :minlat AND F_BOTTOMRIGHTLONGITUDE <= :maxlon"
+    selectSql = generateSqlQuery(dataname, tablename, whereSql)
     ordersql = ' ORDER BY "F_RECEIVETIME" DESC FETCH FIRST :limit_num ROWS ONLY'
     sql = f'{selectSql} {ordersql}'
     geodbhandler = GeoDBHandler()
     geoprocessor = GeoProcessor()
+    target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
+    (minlon, maxlon, minlat, maxlat) = geoprocessor.getCoordinateRange(target_area)
     coverage_ratio = 0
     n = 1
     try:
         while coverage_ratio < 0.9 and n < 9:
             limit_num = 10000 * n
-            data, columns = fetchDataFromDB(pool, sql, {'limit_num': limit_num})
+            data, columns = fetchDataFromDB(pool, sql, {'limit_num': limit_num, 'minlon': minlon, 'maxlon': maxlon, 'minlat': minlat, 'maxlat': maxlat})
             data_gdf = geodbhandler.dbDataToGeoDataFrame(data, columns)
-            target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
             intersected_data = geoprocessor.findIntersectedData(target_area, data_gdf)
             coverage_ratio = geoprocessor.calCoverageRatio(target_area, intersected_data)
             n += 1
@@ -158,15 +161,15 @@ def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTim
         dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                     "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                     "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
-        whereSql = ' WHERE  F_RECEIVETIME BETWEEN TO_DATE(:startTime, \'YYYY-MM-DD HH24:MI:SS\') AND TO_DATE(:endTime, \'YYYY-MM-DD HH24:MI:SS\') AND F_CLOUDPERCENT <= :cloudPercent'
+        whereSql = " WHERE  F_RECEIVETIME BETWEEN TO_DATE(:startTime, \'YYYY-MM-DD HH24:MI:SS\') AND TO_DATE(:endTime, \'YYYY-MM-DD HH24:MI:SS\') AND F_CLOUDPERCENT <= :cloudPercent"
         selectSql = generateSqlQuery(dataname, tablename, whereSql)
         orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
         sql = f'{selectSql} {orderSql}'
+        target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
+        geoprocessor = GeoProcessor()
         ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent})
         geodbhandler = GeoDBHandler()
         ImageGdf = geodbhandler.dbDataToGeoDataFrame(ImageInfo, columns)
-        target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
-        geoprocessor = GeoProcessor()
         intersected_data = geoprocessor.findIntersectedData(target_area, ImageGdf)
         result = geoprocessor.GeoDataFrameToDict(intersected_data)
         formatted_result = formatDictForView(result)
@@ -198,9 +201,7 @@ def querySubscribedData(tablename: list, wkt: str, areacode: str, startTime: str
         selectSql = generateSqlQuery(dataname, tablename, whereSql)
         orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
         sql = f'{selectSql} {orderSql}'
-        print(sql)
         ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent})
-        print(ImageInfo)
         geodbhandler = GeoDBHandler()
         ImageGdf = geodbhandler.dbDataToGeoDataFrame(ImageInfo, columns)
         target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
@@ -254,7 +255,7 @@ def ProcessDueSubscriptions(pool):
         sql = selectSql
         data = executeQuery(pool, sql)
         
-        def processASubscription(sub):
+        for sub in data:
             IsWKT = sub[3]
             if(IsWKT == 1):
                 wkt = sub[9]
@@ -269,15 +270,78 @@ def ProcessDueSubscriptions(pool):
             endTime = str(sub[8])
             cloudPercent = sub[5]
             logger.info(f'startTime: {startTime}, endTime: {endTime}, cloudPercent: {cloudPercent}')
-            datanames = querySubscribedData(tablenames, wkt, areacode, startTime, endTime, cloudPercent, userid, pool)
+            # datanames = querySubscribedData(tablenames, wkt, areacode, startTime, endTime, cloudPercent, userid, pool)
+            dataInfos = searchData(tablenames, wkt, areacode, startTime, endTime, cloudPercent, pool)
+            datanames = [data['F_DATANAME'] for data in dataInfos]
             sendEmailToUser(userid, datanames, pool)
+            addDataToShop(dataInfos, userid, pool)
             updateSubOrderStatus(pool, subid)
-        executor = ThreadPoolExecutor()
-        executor.map(processASubscription, data)
         
     except Exception as e:
         logger.error(f'处理过期订阅失败: {e}')
         return None
+
+def addDataToShop(dataInfos: list, userid, pool):
+    """将数据添加到购物车"""
+    sql = "INSERT INTO TF_SHOP ( \
+            F_ID, F_USERID, F_DATANAME, F_SATELITE, F_SENSOR, \
+            F_RECEIVETIME, F_DATASIZE, F_FAVORITETIME, F_DATASOURCE, \
+            F_DATAPATH, F_DATATYPE, F_NODEID, F_DATAID, F_DOCNUM, \
+            F_TM, F_DATATYPENAME, F_PRODUCTLEVEL, F_IMAGEURL, \
+            F_WKTRESPONSE, F_NODENAME, F_DOCNUM_OLD, F_CLOUDPERCENT, \
+            F_LOCATION, F_SGTABLENAME, F_DID, F_ORBITID, F_SCENEPATH, \
+            F_SCENEROW, F_SYSTEMTYPE\
+        ) VALUES ( \
+            :F_ID, :F_USERID, :F_DATANAME, :F_SATELITE, :F_SENSOR, \
+            TO_DATE(:F_RECEIVETIME, 'YYYY-MM-DD HH24:MI:SS'), :F_DATASIZE, \
+            TO_DATE(:F_FAVORITETIME, 'YYYY-MM-DD HH24:MI:SS'), :F_DATASOURCE, \
+            :F_DATAPATH, :F_DATATYPE, :F_NODEID, :F_DATAID, :F_DOCNUM, \
+            :F_TM, :F_DATATYPENAME, :F_PRODUCTLEVEL, :F_IMAGEURL, \
+            :F_WKTRESPONSE, :F_NODENAME, :F_DOCNUM_OLD, :F_CLOUDPERCENT, \
+            :F_LOCATION, :F_SGTABLENAME, :F_DID, :F_ORBITID, :F_SCENEPATH, \
+            :F_SCENEROW, :F_SYSTEMTYPE) "
+
+    def addSingleDataToShop(dataInfo, userid):
+        try:
+            params = {}
+            params['F_ID'] = getPkId()
+            params['F_USERID'] = int(userid)
+            params['F_DATANAME'] = dataInfo['F_DATANAME']
+            params['F_SATELITE'] = dataInfo['F_SATELLITEID']
+            params['F_SENSOR'] = dataInfo['F_SENSORID']
+            params['F_RECEIVETIME'] = dataInfo['F_RECEIVETIME']
+            params['F_DATASIZE'] = float(dataInfo['F_DATASIZE'])
+            params['F_FAVORITETIME'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            params['F_DATASOURCE'] = None
+            params['F_DATAPATH'] = None
+            params['F_DATATYPE'] = 0
+            params['F_NODEID'] = dataInfo['NODEID']
+            params['F_DATAID'] = dataInfo['F_DATAID']
+            params['F_DOCNUM'] = None
+            params['F_TM'] = None
+            params['F_DATATYPENAME'] = dataInfo['F_DATATYPENAME']
+            params['F_PRODUCTLEVEL'] = dataInfo['F_PRODUCTLEVEL']
+            params['F_IMAGEURL'] = '/mj/metaImage/getImageByTypeForAll?typeId=2&dataId={}&nodeId={}'.format(dataInfo['F_DID'],dataInfo['NODEID'])
+            params['F_WKTRESPONSE'] = dataInfo['WKTRESPONSE']
+            params['F_NODENAME'] = NodeIdToNodeName[dataInfo['NODEID']]
+            params['F_DOCNUM_OLD'] = None
+            params['F_CLOUDPERCENT'] = float(dataInfo['F_CLOUDPERCENT'])
+            params['F_LOCATION'] = dataInfo['F_LOCATION']
+            params['F_SGTABLENAME'] = dataInfo['F_TABLENAME']
+            params['F_DID'] = int(dataInfo['F_DID'])
+            params['F_ORBITID'] = None if dataInfo['F_ORBITID'] == 'None' else int(dataInfo['F_ORBITID'])
+            params['F_SCENEPATH'] = dataInfo['F_SCENEPATH']
+            params['F_SCENEROW'] = dataInfo['F_SCENEROW']
+            params['F_SYSTEMTYPE'] = None
+            executeNonQuery(pool, sql, params)
+        except Exception as e:
+            logger.error('添加数据到购物车失败: {}, 错误数据: {}, userid: {}'.format(e, dataInfo, userid))
+    
+    executor = ThreadPoolExecutor()
+    executor.map(addSingleDataToShop, dataInfos, [userid]*len(dataInfos))
+   
+        
+        
        
 def getShapelyAreaByCode(areacode: str, pool): 
     """根据传入的行政区划代码获取行政区划的几何形状
@@ -320,13 +384,14 @@ def formatDictForView(dictList: list):
                 logger.error(f"获取NODEID失败, 不识别的卫星名或传感器名: {e}")
 
             newDict['RN'] = index + 1
+            newDict['NODENAME'] = NodeIdToNodeName[newDict['NODEID']]
             res.append(newDict)
         return res
     except Exception as e:
         logger.error(f'格式化字典列表失败: {e}')
         return None
 
-def generateSqlQuery(dataname: list, tablename: list, wheresql: str = None) ->str:
+def generateSqlQuery(dataname: list, tablename: list, wheresql: str = None) -> str:
     """根据传入的表名和字段名生成查询语句
 
     Args:

@@ -48,3 +48,15 @@ def executeNonQuery(pool: oracledb.ConnectionPool, sql: str, params = None):
     except Exception as e:
         logger.error(f'执行SQL语句失败: {e}, sql: {sql}, params: {params}')
  
+def executeQueryAsDict(pool: oracledb.ConnectionPool, sql: str, params = None):
+    try:
+        with pool.acquire() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                res = cur.fetchall()
+                columns = [col[0] for col in cur.description]
+                dict_res = [dict(zip(columns, row)) for row in res]
+        return dict_res
+    except Exception as e:
+        logger.error(f'执行SQL语句失败: {e}, sql: {sql}, params: {params}')
+        return None

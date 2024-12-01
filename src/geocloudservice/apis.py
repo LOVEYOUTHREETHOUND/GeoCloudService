@@ -407,8 +407,8 @@ def app_get_areas_api(app, siwa):
 
         tree = get_ares_tree(code, q_type, show_wkt, show_sub, show_all_sub)
         if not tree:
-            return custom_response({"error": "未找到对应的地区信息"}, 500)
-        return custom_response(tree)
+            return app_response({"error": "未找到对应的地区信息"}, 500)
+        return app_response(tree)
 
     def get_ares_tree(code, q_type, show_wkt, show_sub, show_all_sub):  # 参数均未使用
         pool = create_pool()
@@ -424,10 +424,14 @@ def app_get_areas_api(app, siwa):
         :param data: 行政区数据列表，线性，各个元素是包含code和name字段的字典
         :return: 树形结构数据
         """
-        prov_list = []
+        data = [
+            {"code": item["code"].removeprefix("156"), "name": item["name"]}  # removeprefix 需要Python 3.9
+            for item in data
+        ]
         data.sort(key=lambda x: x["code"])
         if data[0]["code"] == "000000":  # 去除全国'000000'节点避免问题
             data.pop(0)
+
         nodes = {
             item["code"]: (
                 {"code": item["code"], "name": item["name"], "child": []}
@@ -438,6 +442,7 @@ def app_get_areas_api(app, siwa):
         }
 
         # 连接父子关系
+        prov_list = []
         for item in data:
             area_code = item["code"]
             prov_code = area_code[:2] + "0000"  # 获取省级节点代码
@@ -456,7 +461,7 @@ def app_get_areas_api(app, siwa):
 
 
 # app端的响应似乎都遵循这个格式，抽离出来
-def custom_response(data: dict, status_code: int = 200):
+def app_response(data: dict, status_code: int = 200):
     DECRYPT_FLAG = False  # 两个变量临时放这儿
     VERSION = "v0.1.0-alpha1"
     response = {

@@ -7,9 +7,11 @@ from flask_cors import CORS
 from marshmallow import ValidationError
 from marshmallow import Schema, fields
 import requests
-from minio import Minio
+import minio 
 from minio.error import S3Error
-import io
+from src.utils.db.minIO import create_minio_client
+from src.utils.logger import logger
+from urllib.parse import quote
 
 
 # from src.utils.db.oracle import create_pool
@@ -54,6 +56,7 @@ def gen_app():
     #cmm20241023已完成订单统计优化
     bp_stat(app, siwa)
     product_intro(app, siwa)
+    user_guide(app,siwa)
     # app.register_blueprint(bp_feedback)
     # app.register_blueprint(bp_stat)
     return app
@@ -410,7 +413,7 @@ def user_guide(app,siwa):
         }
         video_url = video_resources.get(title)
         if video_url:
-            return jsonify({'hredData': video_url})
+            return jsonify({'hrefData': video_url})
         else:
             return jsonify({'error': '未找到对应的视频链接'}), 404
 
@@ -418,7 +421,7 @@ def user_guide(app,siwa):
     @user_guide.route('/videodownload', methods=['GET'])
     @siwa.doc(
         summary="获取操作指导视频下载接口",
-        description="从 MinIO 存储下载指导视频文件",
+        description="获取操作指导视频下载接口",
         tags=["userGuide"]
     )
     def download_video():
@@ -429,9 +432,11 @@ def user_guide(app,siwa):
 
         # 根据标题找到文件映射路径（可以根据需要动态生成或从配置中读取）
         minio_file_mapping = {
-            "地质云遥感数据平台操作说明": "videos/system_guide_demo.mp4"
+            "地质云遥感数据平台操作说明": "系统操作演示视频.mp4"
         }
         object_name = minio_file_mapping.get(title)
+
+        bucket_name = "satellite.pic"
 
         if not object_name:
             return jsonify({"error": "视频文件不存在"}), 404
@@ -442,11 +447,13 @@ def user_guide(app,siwa):
             # 获取文件大小
             stat = minio_client.stat_object(bucket_name, object_name)
 
+            encoded_file_name = quote(f'{title}.mp4')
+
             # 生成流式响应
             return Response(
                 response,  # 文件流
                 headers={
-                    "Content-Disposition": f"attachment; filename={title}.mp4",  # 下载文件名
+                    "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_file_name}",  # 下载文件名
                     "Content-Type": "video/mp4",  # 设置视频文件类型
                     "Content-Length": str(stat.size),  # 文件大小
                 },

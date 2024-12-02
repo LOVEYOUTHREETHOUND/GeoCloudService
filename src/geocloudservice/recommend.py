@@ -7,6 +7,7 @@ from src.utils.Email import send_email
 from src.utils.IdMaker import getPkId
 from src.utils.db.oracle import executeNonQuery, executeQuery
 from src.config.config import satelliteToNodeId, NodeIdToNodeName
+from src.utils.CacheManager import CacheManager
 
 def fetchDataFromDB(pool, sql:str ,param=None):
     """从数据库中获取数据和字段名"""
@@ -34,8 +35,28 @@ def getTargetArea(geodbhandler: GeoDBHandler, wkt: str, areaCode: str, pool):
         logger.error(f'获取目标区域失败: {e}')
         return None
 
-# def recommendData(tablename: list, wkt: str, areacode: str , pool) ->list:
-def recommendData(tablename: list, wkt: str, areacode: str , pool, page: int, pagesize: int = 30) ->list:
+def cacheFetchRecommendData(tablename: list, wkt: str, areacode: str , pool, 
+                            cache: CacheManager, guid: str, page: int, pagesize: int = 30 ) ->list:
+    cacheKey = cache.getCacheKey('fetchRecommendData', guid)
+    cacheData = cache.getData(cacheKey)
+    
+    if cacheData is not None:
+        geoData, coverageRatio = cacheData
+    else:
+        geoData, coverageRatio = fetchRecommendData(tablename, wkt, areacode, pool)
+        cache.setData(cacheKey, (geoData, coverageRatio))
+      
+    geoprocessor = GeoProcessor()
+    geoDataDict = geoprocessor.GeoDataFrameToDict(geoData)
+    formattedDataDict = formatDictForView(geoDataDict)  
+    
+    startIndex = (page - 1) * pagesize
+    endIndex = page * pagesize
+    paginatedData = formattedDataDict[startIndex:endIndex]
+    return paginatedData, coverageRatio
+    
+    
+def fetchRecommendData(tablename: list, wkt: str, areacode: str , pool):
     """一键推荐功能具体实现
 
     Args:
@@ -46,7 +67,7 @@ def recommendData(tablename: list, wkt: str, areacode: str , pool, page: int, pa
         areacode和wkt能且只能有一个不为空
 
     Returns:
-        字典列表, 每一条字典代表一条数据
+        与目标区域相交的数据,GeoDataFrame格式
         覆盖率
     """
     
@@ -74,69 +95,24 @@ def recommendData(tablename: list, wkt: str, areacode: str , pool, page: int, pa
             intersected_data = geoprocessor.findIntersectedData(target_area, data_gdf)
             coverage_ratio = geoprocessor.calCoverageRatio(target_area, intersected_data)
             n += 1
-        result = geoprocessor.GeoDataFrameToDict(intersected_data)
-        formatted_result = formatDictForView(result)
-        start_index = (page - 1) * pagesize
-        end_index = start_index + pagesize
-        selected_result = formatted_result[start_index:end_index]
-        return selected_result, coverage_ratio
+        return intersected_data, coverage_ratio
     except Exception as e:
         logger.error(f'推荐数据失败: {e}')
         return None
 
-def recommendCoverData(tablename: list, wkt: str, areacode: str , pool) ->dict:
-    """一键推荐功能具体实现
-
-    Args:
-        tablename (list): 需要查询的表名列表(与卫星绑定)
-        wkt (str): 检索区域的wkt
-        areacode (str): 检索区域的行政区划代码
-        pool (_type_): 数据库连接池
-        areacode和wkt能且只能有一个不为空
-
-    Returns:
-        字典列表, 每一条字典代表一条数据
-        覆盖率
-    """
+def cacheFeachRecomCoverData(tablename: list, wkt: str, areacode: str , cache: CacheManager, guid: str, pool) ->dict:
+    cacheKey = cache.getCacheKey('fetchRecommendData', guid)
+    cacheData = cache.getData(cacheKey)
+    if cacheData is not None:
+        geoData, _ = cacheData
+    else:
+        geoData, coverageRatio = fetchRecommendData(tablename, wkt, areacode, pool)
+        cache.setData(cacheKey, (geoData, coverageRatio))
     
-    if wkt is None and areacode is None:
-        logger.error('wkt和areacode不能同时为空')
-        return None
-    dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
-                "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
-                "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
-    whereSql = "WHERE F_TOPLEFTLATITUDE <= :maxlat AND F_TOPLEFTLONGITUDE >= :minlon AND F_BOTTOMRIGHTLATITUDE >= :minlat AND F_BOTTOMRIGHTLONGITUDE <= :maxlon"
-    selectSql = generateSqlQuery(dataname, tablename, whereSql)
-    ordersql = ' ORDER BY "F_RECEIVETIME" DESC FETCH FIRST :limit_num ROWS ONLY'
-    sql = f'{selectSql} {ordersql}'
-    geodbhandler = GeoDBHandler()
+    sizenum = len(geoData)
     geoprocessor = GeoProcessor()
-    target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
-    (minlon, maxlon, minlat, maxlat) = geoprocessor.getCoordinateRange(target_area)
-    coverage_ratio = 0
-    n = 1
-    try:
-        while coverage_ratio < 0.9 and n < 9:
-            limit_num = 100 * n
-            data, columns = fetchDataFromDB(pool, sql, {'limit_num': limit_num, 'minlon': minlon, 'maxlon': maxlon, 'minlat': minlat, 'maxlat': maxlat})
-            data_gdf = geodbhandler.dbDataToGeoDataFrame(data, columns)
-            intersected_data = geoprocessor.findIntersectedData(target_area, data_gdf)
-            coverage_ratio = geoprocessor.calCoverageRatio(target_area, intersected_data)
-            n += 1
-        sizenum = len(intersected_data)
-        
-        combine_wkt, total_area = geoprocessor.calculateMergedArea(intersected_data)
-        print(combine_wkt)
-        return {
-            "SIZENUM": sizenum,
-            "WKTRESPONSE": combine_wkt,
-            "TOTAL": total_area,
-            "RN": 1
-        }
-    except Exception as e:
-        logger.error(f'推荐数据合并失败: {e}')
-        return None
-
+    combine_wkt, total_area = geoprocessor.calculateMergedArea(geoData)
+    return sizenum, combine_wkt, total_area, 1
 
 def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTime: str, cloudPercent: str, pool) ->list:
     """检索功能具体实现
@@ -163,10 +139,10 @@ def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTim
         selectSql = generateSqlQuery(dataname, tablename, whereSql)
         orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
         sql = f'{selectSql} {orderSql}'
+        geodbhandler = GeoDBHandler()
         target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
         geoprocessor = GeoProcessor()
         ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent})
-        geodbhandler = GeoDBHandler()
         ImageGdf = geodbhandler.dbDataToGeoDataFrame(ImageInfo, columns)
         intersected_data = geoprocessor.findIntersectedData(target_area, ImageGdf)
         result = geoprocessor.GeoDataFrameToDict(intersected_data)

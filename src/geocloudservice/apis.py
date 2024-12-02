@@ -6,7 +6,10 @@ import json
 from flask_cors import CORS
 from marshmallow import ValidationError
 from marshmallow import Schema, fields
-
+import requests
+from minio import Minio
+from minio.error import S3Error
+import io
 
 
 # from src.utils.db.oracle import create_pool
@@ -35,6 +38,7 @@ def gen_app():
     search_query_bp = search_query_blueprint(app, siwa)
     app.register_blueprint(search_query_bp)
 
+    app.register_blueprint(subscribe_blueprint(app, siwa))
 
     @app.post(f"/test")
     @siwa.doc(
@@ -386,6 +390,70 @@ def product_intro(app,siwa):
                 connection.close()
 
     app.register_blueprint(product_intro)
-    app.register_blueprint(subscribe_blueprint(app, siwa))
 
 
+
+
+def user_guide(app,siwa):
+    user_guide = Blueprint("user_guide", __name__, url_prefix='/userGuide')
+    # 获取操作指导视频链接接口
+    @user_guide.route('/videourl', methods=['GET'])
+    @siwa.doc(
+        summary="获取操作指导视频链接接口",
+        description="获取操作指导视频链接接口",
+        tags=["userGuide"]
+    )
+    def get_video_url():
+        title = request.args.get('title')
+        video_resources = {
+            "地质云遥感数据平台操作说明":"http://10.82.8.64:8080/satellite.pic/%E7%B3%BB%E7%BB%9F%E6%93%8D%E4%BD%9C%E6%BC%94%E7%A4%BA%E8%A7%86%E9%A2%91.mp4"
+        }
+        video_url = video_resources.get(title)
+        if video_url:
+            return jsonify({'hredData': video_url})
+        else:
+            return jsonify({'error': '未找到对应的视频链接'}), 404
+
+    # 获取操作指导视频下载接口
+    @user_guide.route('/videodownload', methods=['GET'])
+    @siwa.doc(
+        summary="获取操作指导视频下载接口",
+        description="从 MinIO 存储下载指导视频文件",
+        tags=["userGuide"]
+    )
+    def download_video():
+
+        minio_client = create_minio_client()
+
+        title = request.args.get('title')  # 从请求参数获取视频标题
+
+        # 根据标题找到文件映射路径（可以根据需要动态生成或从配置中读取）
+        minio_file_mapping = {
+            "地质云遥感数据平台操作说明": "videos/system_guide_demo.mp4"
+        }
+        object_name = minio_file_mapping.get(title)
+
+        if not object_name:
+            return jsonify({"error": "视频文件不存在"}), 404
+
+        try:
+            # 获取文件流
+            response = minio_client.get_object(bucket_name, object_name)
+            # 获取文件大小
+            stat = minio_client.stat_object(bucket_name, object_name)
+
+            # 生成流式响应
+            return Response(
+                response,  # 文件流
+                headers={
+                    "Content-Disposition": f"attachment; filename={title}.mp4",  # 下载文件名
+                    "Content-Type": "video/mp4",  # 设置视频文件类型
+                    "Content-Length": str(stat.size),  # 文件大小
+                },
+                status=200,
+            )
+        except S3Error as e:
+            logger.error(f"从 MinIO 下载视频文件失败: {e}, 文件名: {object_name}")
+            return jsonify({"error": f"无法下载视频文件: {str(e)}"}), 500
+
+    app.register_blueprint(user_guide)

@@ -134,7 +134,5 @@ class GeoProcessor:
             # 返回合并面和面积
             return combined_data.wkt, total_area
         except Exception as e:
-            print(f"计算合并面及其面积时出现错误: {e}")
-            return {
-                "error": f"计算合并面及其面积时出现错误：{e}"
-            }
+            logger.error(f"计算合并面及其面积时出现错误: {e}")
+            return None

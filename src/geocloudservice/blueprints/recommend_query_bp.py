@@ -1,4 +1,4 @@
-from flask import Blueprint, request, Flask
+from flask import Blueprint, request, Flask, g
 from pydantic import BaseModel, Field, HttpUrl
 from flask_cors import CORS
 from flask_siwadoc import SiwaDoc
@@ -6,13 +6,22 @@ from typing import List, Optional, Tuple, Dict, Any, Union
 from marshmallow import ValidationError
 
 from src.utils.db.oracle import create_pool
-from src.geocloudservice.recommend import recommendData, searchData, recommendCoverData
+from src.utils.CacheManager import CacheManager, SimpleCache
+from src.geocloudservice.recommend import cacheFetchRecommendData, searchData, cacheFeachRecomCoverData
 
 
 def rz_app():
     app = Flask(__name__,)
     CORS(app)
     siwa = SiwaDoc(app, title="FJY API", description="地质云航遥节点遥感数据服务系统接口文档")
+    MyPool = create_pool()
+    cache = SimpleCache()
+    MyCacheManager = CacheManager(cache)
+    
+    @app.before_request
+    def loadParams():
+        g.MyPool = MyPool
+        g.MyCacheManager = MyCacheManager
 
     @app.post(f"/test")
     @siwa.doc(
@@ -141,8 +150,7 @@ class totalQueryResponse(BaseModel):
     
 
 def recommend_query_blueprint(app, siwa):
-    recommend_query_bp = Blueprint('recommend_query_bp', __name__, url_prefix='/recommend_query')
-
+    recommend_query_bp = Blueprint('recommend_query_bp', __name__, url_prefix='/recommend_query')  
     @recommend_query_bp.post('/recommend')
     @siwa.doc(
         description='空间查询接口，用于"一键推荐"服务',
@@ -173,14 +181,15 @@ def recommend_query_blueprint(app, siwa):
             if wkt == "":
                 wkt = None
         table_name = query.nodeName.split(',')
-        pool = create_pool()
         
+        guid = query.guid
         pageSize = query.pageSize
         page = query.currentPage
 
-        recommend_data , coverage_ratio = recommendData(table_name, wkt, area_code, pool, page, pageSize)
+        recommend_data , coverage_ratio = cacheFetchRecommendData(table_name, wkt, area_code, g.MyPool, g.MyCacheManager,
+                                                                  guid,page, pageSize)
         
-        recommend_data , coverage_ratio = recommendData(table_name, wkt, area_code, pool)
+        # recommend_data , coverage_ratio = recommendData(table_name, wkt, area_code, pool)
 
         print(coverage_ratio)
 
@@ -222,9 +231,17 @@ def recommend_query_blueprint(app, siwa):
             if wkt == "":
                 wkt = None
         table_name = query.nodeName.split(',')
+        guid = query.guid
 
-        pool = create_pool()
-        recommend_coverage = recommendCoverData(table_name, wkt ,area_code, pool)
+        # pool = create_pool()
+        sizenum, wktresponse,total,rn = cacheFeachRecomCoverData(table_name, wkt ,area_code,
+                                                      g.MyCacheManager, guid, g.MyPool)
+        recommend_coverage = {
+            "SIZENUM" : sizenum,
+            "WKTRESPONSE" : wktresponse,
+            "TOTAL" : total,
+            "RN" : rn
+        }
         
         data = totalQueryData(
             total = 1,
@@ -265,7 +282,7 @@ def search_query_blueprint(app, siwa):
             return {"error": e.errors()}, 400
 
         # 提取查询参数
-        pool = create_pool()
+        # pool = create_pool()
         area_code = query.areaCode  
         wkt = query.wkt
         if area_code == "" and wkt == "":
@@ -286,7 +303,7 @@ def search_query_blueprint(app, siwa):
                     end_time_values = query_field.queryValue[1]
 
 
-        search_data = searchData(table_name, wkt, area_code, start_time_values, end_time_values, cloud_percent_values, pool)
+        search_data = searchData(table_name, wkt, area_code, start_time_values, end_time_values, cloud_percent_values, g.MyPool)
 
         query_response = QueryResponse(
             total=len(search_data),  

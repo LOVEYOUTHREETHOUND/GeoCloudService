@@ -425,7 +425,7 @@ def app_get_areas_api(app, siwa):
         :return: 树形结构数据
         """
         data = [
-            {"code": item["code"].removeprefix("156"), "name": item["name"]}  # removeprefix 需要Python 3.9
+            {"code": item["CODE"].removeprefix("156"), "name": item["NAME"]}  # removeprefix 需要Python 3.9
             for item in data
         ]
         data.sort(key=lambda x: x["code"])
@@ -453,6 +453,9 @@ def app_get_areas_api(app, siwa):
                 if area_code == city_code:  # 判断是否为市级节点
                     nodes[prov_code]["child"].append(nodes[area_code])
                 else:
+                    if city_code not in nodes:
+                        # print(f"未找到{item}的父节点{city_code}")
+                        continue
                     nodes[city_code]["child"].append(nodes[area_code])
 
         return [{"code": "000000", "name": "全国", "child": prov_list}]

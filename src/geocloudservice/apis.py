@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, Blueprint
+from flask import Flask, request, jsonify, Blueprint, Response
 from flask_siwadoc import SiwaDoc
 from waitress import serve
 import oracledb
@@ -13,13 +13,13 @@ from src.utils.db.minIO import create_minio_client
 from src.utils.logger import logger
 from urllib.parse import quote
 
-
-# from src.utils.db.oracle import create_pool
+from src.utils.CacheManager import CacheManager, SimpleCache
+from flask import g
+from src.utils.db.oracle import create_pool, executeQuery, executeNonQuery
 
 from src.geocloudservice.blueprints.spatial_query_bp import spatial_query_blueprint
 from src.geocloudservice.blueprints.recommend_query_bp import search_query_blueprint, recommend_query_blueprint
 from src.geocloudservice.api_models import TimespanQueryModel
-import src.config.config_template as config
 from src.geocloudservice.blueprints.subscribe import subscribe_blueprint
 
 
@@ -29,18 +29,22 @@ def gen_app():
     app = Flask(__name__,)
     CORS(app)
     siwa = SiwaDoc(app, title="FJY API", description="地质云航遥节点遥感数据服务系统接口文档")
-    #cmm20241022用户订单反馈
-    # pool = create_pool()
 
-    # spatial_query_bp = spatial_query_blueprint(siwa, pool)
-    # app.register_blueprint(spatial_query_bp)
+    MyPool = create_pool()
+    cache = SimpleCache()
+    MyCacheManager = CacheManager(cache)
+    
+    @app.before_request
+    def loadParams():
+        g.MyPool = MyPool
+        g.MyCacheManager = MyCacheManager
 
     recommend_query_bp = recommend_query_blueprint(app, siwa)
     app.register_blueprint(recommend_query_bp)
     search_query_bp = search_query_blueprint(app, siwa)
     app.register_blueprint(search_query_bp)
-
-    app.register_blueprint(subscribe_blueprint(app, siwa))
+    subscribe_blueprint_bp = subscribe_blueprint(app, siwa)
+    app.register_blueprint(subscribe_blueprint_bp)
 
     @app.post(f"/test")
     @siwa.doc(
@@ -60,39 +64,6 @@ def gen_app():
     # app.register_blueprint(bp_feedback)
     # app.register_blueprint(bp_stat)
     return app
-
-
-# def bp_stats(app, siwa):
-#     bp_stats = Blueprint("stats", __name__, url_prefix='/stats')
-#     @bp_stats.get("/daily")
-#     @siwa.doc(
-#         summary="每日统计",
-#         description="每日统计",
-#         tags=["stats"],
-#     )
-#     def daily():
-#         return jsonify({"code": 200, "msg": "success", "data": "data"})
-
-#     @bp_stats.get("/monthly")
-#     @siwa.doc(
-#         summary="每月统计",
-#         description="每月统计",
-#         tags=["stats"],
-#     )
-#     def monthly():
-#         return jsonify({"code": 200, "msg": "success"})
-
-#     @bp_stats.get("")
-#     @siwa.doc(
-#         summary="按时间统计接口",
-#         description="按时间统计",
-#         tags=["stats"],
-#         query=TimespanQueryModel
-#     )
-#     def stats():
-#         return jsonify({"code": 200, "msg": "success"})
-
-#     app.register_blueprint(bp_stats)
     
 
 # cmm20241012用户订单反馈接口
@@ -120,12 +91,16 @@ def bp_feedback(app, siwa):
             try:
                 # 连接到 Oracle 数据库
                 # connection = oracledb.connect(user="JGF_GXFW", password="JGF_GXFW", dsn="62.234.192.247:18881/ORCLCDB")
-                connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
+                # connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
 
-                cursor = connection.cursor()
-                cursor.execute("SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0, 2, 5) AND F_CREATTIME BETWEEN TIMESTAMP '2024-01-01 00:00:00' AND TIMESTAMP '2024-09-28 23:59:59'")
-                user = cursor.fetchone()
-                print(f"连接1成功，当前用户: {user[0]}")  # 打印当前用户以验证连接
+                # cursor = connection.cursor()
+                # cursor.execute("SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0, 2, 5) AND F_CREATTIME BETWEEN TIMESTAMP '2024-01-01 00:00:00' AND TIMESTAMP '2024-09-28 23:59:59'")
+                # user = cursor.fetchone()
+                
+                selectSql = "SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0, 2, 5) AND \
+                    F_CREATTIME BETWEEN TIMESTAMP '2024-01-01 00:00:00' AND TIMESTAMP '2024-09-28 23:59:59'"
+                user = executeQuery(g.MyPool, selectSql)
+                print(f"连接1成功,当前用户: {user[0]}")  # 打印当前用户以验证连接
 
                 # 更新 TF_ORDER 表
                 update_query = """
@@ -133,10 +108,11 @@ def bp_feedback(app, siwa):
                 SET F_FEEDBACK = :feedback, F_APPRAISE = :appraise
                 WHERE F_ORDERNAME = :ordername
                 """
-                cursor.execute(update_query, feedback=content, appraise=score,ordername=ordername)
+                executeNonQuery(g.MyPool, update_query, {'feedback': content, 'appraise': score, 'ordername': ordername})
+                # cursor.execute(update_query, feedback=content, appraise=score,ordername=ordername)
                 
                 # 提交更改
-                connection.commit()
+                # connection.commit()
 
                 return jsonify({'success': True, 'message': '反馈提交成功'})
 
@@ -144,12 +120,12 @@ def bp_feedback(app, siwa):
                 error, = e.args
                 return jsonify({'success': False, 'message': f'数据库错误: {error.message}'}), 500
 
-            finally:
-                # 关闭数据库连接
-                if cursor:
-                    cursor.close()
-                if connection:
-                    connection.close()
+            # finally:
+            #     # 关闭数据库连接
+            #     if cursor:
+            #         cursor.close()
+            #     if connection:
+            #         connection.close()
 
     app.register_blueprint(bp_feedback)
 
@@ -189,12 +165,14 @@ def bp_stat(app, siwa):
             # start_time = inner_data.get('lessCreattimeStr')
             # end_time = inner_data.get('moreCreattimeStr')
             # print(f"接收到的请求体: {data}")
-            print(f"前端收到用户的查询：起始时间{start_time}，结束时间{end_time}")
-                # ... 其他代码
+            # print(f"前端收到用户的查询：起始时间{start_time}，结束时间{end_time}")
+            #     # ... 其他代码
 
-            print('{lessCreattimeStr}', start_time, end_time)
-            print(f"接收到的请求体: {data}")
-            print(f"前端收到用户的查询：起始时间{start_time}，结束时间{end_time}")
+            # print('{lessCreattimeStr}', start_time, end_time)
+            # print(f"接收到的请求体: {data}")
+            # print(f"前端收到用户的查询：起始时间{start_time}，结束时间{end_time}")
+            logger.info(f"前端收到用户的查询：起始时间{start_time}，结束时间{end_time}")
+            logger.info(f"接收到的请求体: {data}")
         except ValidationError as err:
             return jsonify(err.messages), 400
         
@@ -205,28 +183,39 @@ def bp_stat(app, siwa):
         #     return jsonify({'success': False, 'message': '时间不能为空'}), 400
 
         try:
-            connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
-            cursor = connection.cursor()
-            cursor.execute("SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0, 2, 5) AND F_CREATTIME BETWEEN TIMESTAMP '2024-01-01 00:00:00' AND TIMESTAMP '2024-09-28 23:59:59'")
-            user = cursor.fetchone()
+            # connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
+            # cursor = connection.cursor()
+            # cursor.execute("SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0, 2, 5) AND F_CREATTIME BETWEEN TIMESTAMP '2024-01-01 00:00:00' AND TIMESTAMP '2024-09-28 23:59:59'")
+            # user = cursor.fetchone()
+            selectSql = "SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0, 2, 5) AND \
+                F_CREATTIME BETWEEN TIMESTAMP '2024-01-01 00:00:00' AND TIMESTAMP '2024-09-28 23:59:59'"
+            user = executeQuery(g.MyPool, selectSql)
             print(f"连接成功，当前用户: {user[0]}")  # 打印当前用户以验证连接
 
             # 使用参数化查询，确保日期格式正确
-            query1 = "SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS=6 AND F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND F_GET_METHOD = :F_GET_METHOD"
+            query1 = "SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS=6 AND F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') \
+                AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND F_GET_METHOD = :F_GET_METHOD"
             
             #离线订单数量offline_order_num
-            cursor.execute(query1, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')
-            offline_order_num = cursor.fetchone()[0]
+            # cursor.execute(query1, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')
+            # offline_order_num = cursor.fetchone()[0]
+            offline_order_num = executeQuery(g.MyPool, query1, 
+                                             {'start_time': start_time, 'end_time' : end_time, 'F_GET_METHOD': '线下拷贝'})[0]
 
             #在线订单数量online_order_num
-            cursor.execute(query1, start_time=start_time, end_time=end_time, F_GET_METHOD='在线下载')
-            online_order_num = cursor.fetchone()[0]
+            # cursor.execute(query1, start_time=start_time, end_time=end_time, F_GET_METHOD='在线下载')
+            # online_order_num = cursor.fetchone()[0]
+            online_order_num = executeQuery(g.MyPool, query1, 
+                                             {'start_time': start_time, 'end_time' : end_time, 'F_GET_METHOD': '在线下载'})[0]
 
             #离线订单数据量offline_order_size
-            query2="SELECT F_DATA_SUM FROM TF_ORDER WHERE F_STATUS=6 AND F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND F_GET_METHOD = :F_GET_METHOD"
-            cursor.execute(query2, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')
-            print(cursor.fetchone())
-            results=cursor.fetchall()
+            query2="SELECT F_DATA_SUM FROM TF_ORDER WHERE F_STATUS=6 AND F_CREATTIME \
+                BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND F_GET_METHOD = :F_GET_METHOD"
+            # cursor.execute(query2, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')
+            # print(cursor.fetchone())
+            # results=cursor.fetchall()
+            results = executeQuery(g.MyPool, query2, 
+                                             {'start_time': start_time, 'end_time' : end_time, 'F_GET_METHOD': '线下拷贝'})
             # 初始化总和
             total_sum = 0
             # 处理每个结果
@@ -246,13 +235,16 @@ def bp_stat(app, siwa):
             total_sum=total_sum/1024
             # print(results)
             # 打印总和
-            print("离线订单总数据量：", total_sum)
+            # print("离线订单总数据量：", total_sum)
+            logger.info(f"离线订单总数据量：{total_sum}")
             offline_order_size = round(total_sum, 0)
 
             #在线订单数据量online_order_size
-            cursor.execute(query2, start_time=start_time, end_time=end_time, F_GET_METHOD='在线下载')
-            print(cursor.fetchone())
-            results=cursor.fetchall()
+            # cursor.execute(query2, start_time=start_time, end_time=end_time, F_GET_METHOD='在线下载')
+            # print(cursor.fetchone())
+            # results=cursor.fetchall()
+            results = executeQuery(g.MyPool, query2,
+                                  {'start_time': start_time, 'end_time': end_time, 'F_GET_METHOD': '在线下载'})
             # 初始化总和
             total_sum = 0
             # 处理每个结果
@@ -272,17 +264,24 @@ def bp_stat(app, siwa):
             total_sum=total_sum/1024
             # print(results)
             # 打印总和
-            print("在线订单总数据量：", total_sum)
+            # print("在线订单总数据量：", total_sum)
+            logger.info(f"在线订单总数据量：{total_sum}")
             online_order_size = round(total_sum, 0)
 
             #离线订单景数offline_order_scene_num
-            query3="SELECT SUM(F_DATACOUNT) FROM TF_ORDER WHERE F_STATUS=6 AND F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND F_GET_METHOD = :F_GET_METHOD"
-            cursor.execute(query3, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')
-            offline_order_scene_num = cursor.fetchone()[0]
+            query3="SELECT SUM(F_DATACOUNT) FROM TF_ORDER WHERE F_STATUS=6 AND \
+                    F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND \
+                    F_GET_METHOD = :F_GET_METHOD"
+            # cursor.execute(query3, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')
+            # offline_order_scene_num = cursor.fetchone()[0]
+            offline_order_scene_num = executeQuery(g.MyPool, query3,
+                                        {'start_time': start_time, 'end_time': end_time, 'F_GET_METHOD': '线下拷贝'})[0]
 
             #在线订单景数online_order_scene_num
-            cursor.execute(query3, start_time=start_time, end_time=end_time, F_GET_METHOD='在线下载')
-            online_order_scene_num = cursor.fetchone()[0]
+            # cursor.execute(query3, start_time=start_time, end_time=end_time, F_GET_METHOD='在线下载')
+            # online_order_scene_num = cursor.fetchone()[0]
+            online_order_scene_num = executeQuery(g.MyPool, query3,
+                                        {'start_time': start_time, 'end_time': end_time, 'F_GET_METHOD': '在线下载'})[0]
 
 
                # 构建响应数据
@@ -298,16 +297,17 @@ def bp_stat(app, siwa):
             }
 
             return jsonify(order_stats)
-        # except oracledb.DatabaseError as e:
-        #     error, = e.args
-        #     return jsonify({'success': False, 'message': f'数据库错误: {error.message}'}), 500
+        except oracledb.DatabaseError as e:
+            error, = e.args
+            logger.error(f'数据库错误: {error.message}')
+            return jsonify({'success': False, 'message': f'数据库错误: {error.message}'}), 500
 
 
-        finally:
-            if cursor:
-                cursor.close()
-            if connection:
-                connection.close()
+        # finally:
+        #     if cursor:
+        #         cursor.close()
+        #     if connection:
+        #         connection.close()
         
 
     app.register_blueprint(bp_stat)
@@ -323,7 +323,8 @@ def product_intro(app,siwa):
     )
     def get_satellites():
         try:
-            connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
+            # connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
+            connection = g.MyPool.acquire()
             cursor = connection.cursor()
             cursor.execute("""
                 SELECT id, satellites_name 
@@ -361,15 +362,21 @@ def product_intro(app,siwa):
 
             if not name:
                 return jsonify({"error": "未获取卫星名"}), 400
-            connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
-            cursor = connection.cursor()
-            cursor.execute("""
+            # connection = oracledb.connect(user="jgf_gxfw", password="icw3kx45", dsn="10.82.8.4:1521/satdb")
+            # cursor = connection.cursor()
+            # cursor.execute("""
+            #     SELECT id, satellites_name, image_url, description 
+            #     FROM satellitesinfo
+            #     WHERE satellites_name = :name
+            # """, name=name)
+
+            # row = cursor.fetchone()
+            
+            selectSql = """
                 SELECT id, satellites_name, image_url, description 
                 FROM satellitesinfo
-                WHERE satellites_name = :name
-            """, name=name)
-
-            row = cursor.fetchone()
+                WHERE satellites_name = :name"""
+            row = executeQuery(g.MyPool, selectSql, {'name': name})[0]
 
             if row:
                 satellite = {
@@ -386,11 +393,11 @@ def product_intro(app,siwa):
             error, = e.args
             return jsonify({"error": str(error)}), 500
 
-        finally:
-            if cursor:
-                cursor.close()
-            if connection:
-                connection.close()
+        # finally:
+        #     if cursor:
+        #         cursor.close()
+        #     if connection:
+        #         connection.close()
 
     app.register_blueprint(product_intro)
 

@@ -18,6 +18,8 @@ dependencies = [
     "geopandas>=1.0.1",
     "flask-cors>=5.0.0",
     "marshmallow>=3.23.1",
+    "requests>=2.32.3",
+    "minio>=7.2.12",
 ]
 requires-python = "==3.11.*"
 readme = "README.md"

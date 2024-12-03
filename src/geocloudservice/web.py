@@ -4,7 +4,7 @@ from src.geocloudservice.blueprints.recommend_query_bp import rz_app
 
 
 def main():
-    app = rz_app()
+    app = gen_app()
     app.run("0.0.0.0", 12345)
 
 

@@ -226,8 +226,7 @@ def ProcessDueSubscriptions(pool):
         tabelname = ["SUBSCRIBE_ORDER"]
         whereSql = ' WHERE  SUBENDTIME < SYSDATE AND STATUS = 0'
         selectSql = generateSqlQuery(dataname, tabelname, whereSql)
-        sql = selectSql
-        data = executeQuery(pool, sql)
+        data = executeQuery(pool, selectSql)
         
         for sub in data:
             IsWKT = sub[3]
@@ -312,10 +311,7 @@ def addDataToShop(dataInfos: list, userid, pool):
             logger.error('添加数据到购物车失败: {}, 错误数据: {}, userid: {}'.format(e, dataInfo, userid))
     
     executor = ThreadPoolExecutor()
-    executor.map(addSingleDataToShop, dataInfos, [userid]*len(dataInfos))
-   
-        
-        
+    executor.map(addSingleDataToShop, dataInfos, [userid]*len(dataInfos))       
        
 def getShapelyAreaByCode(areacode: str, pool): 
     """根据传入的行政区划代码获取行政区划的几何形状

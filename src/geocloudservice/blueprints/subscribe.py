@@ -1,4 +1,4 @@
-from flask import Blueprint, request, Flask
+from flask import Blueprint, request, Flask, g
 from pydantic import BaseModel, Field, HttpUrl
 from flask_cors import CORS
 from flask_siwadoc import SiwaDoc
@@ -19,13 +19,48 @@ class Table(BaseModel):
 
 
 class SubscribeRequest(BaseModel):
-    LoginName: str = Field(..., description="登录名")
+    loginName: str = Field(..., description="登录名")
     areaCode: str = Field(..., description="区域编码")
     wkt: str = Field(..., description="WKT格式区域")
     isNoWkt: str = Field(..., description="是否WKT格式")
     nodeName: str = Field(..., description="数据库表名列表")
     tables: Optional[List[Table]] = None
+
+def subscribe_blueprint(app: Flask, siwa: SiwaDoc) -> Blueprint:
+    subscribe = Blueprint("subscribe", __name__)
     
+    @siwa.doc(
+        description="订阅功能接口",   
+        body=SubscribeRequest
+    )
+    @subscribe.route("/agrsQueryModuleSpatial/sendSubscribeRequest", methods=["POST"])
+    def subscribeService():
+        try:
+            json_data = request.get_json()
+            query = SubscribeRequest(**json_data)
+            
+            pool = g.MyPool
+            userId, areaCode, wkt, isWKT, nodeNames, cloudPercent, subStartTime, subEndTime = validateSubscribeRequest(query,pool)
+
+            subTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # 时间格式转化
+            subTime = formatTime(subTime)
+            subStartTime = formatTime(subStartTime)
+            subEndTime = formatTime(subEndTime)
+            
+            # 生成订阅ID
+            subID = generateSubID(pool)
+            
+            # 插入订阅信息
+            insertSubscribe(pool, subID, userId, areaCode, wkt, isWKT, nodeNames, cloudPercent, subTime, subStartTime, subEndTime, "0")
+            return {"subID": subID}
+        except Exception as e:
+            logger.error(f"订阅失败: {e}")
+            return {"subID": None}
+        
+    return subscribe
+
 def formatTime(time: str) -> str:
     try:
         time = datetime.strptime(time, "%Y-%m-%d %H:%M:%S")
@@ -36,13 +71,14 @@ def formatTime(time: str) -> str:
     
 def generateSubID(pool) -> str:
     sql = "select SUBID from SUBSCRIBE_ORDER where SUBID is not null order by SUBID desc fetch first 1 rows only"
-    newestSubID = executeQuery(pool, sql)[0][0]
+    newestSubID = executeQuery(pool, sql)
     currentDate = datetime.now().strftime("%Y%m%d")
     
     # 检查日期
-    if newestSubID is None:
+    if len(newestSubID) != 0:
         sequenctPart = 1
     else:
+        newestSubID = newestSubID[0][0]
         dataPart = newestSubID[:8]
         sequenctPart = int(newestSubID[10:])   
         if currentDate != dataPart:
@@ -74,7 +110,7 @@ def insertSubscribe(pool, subID: str, userId: str, areaCode: str, wkt: str, isWK
     executeNonQuery(pool, sql, parames)
  
 def validateSubscribeRequest(request: SubscribeRequest, pool):
-        LoginName = request.LoginName
+        LoginName = request.loginName
         userId = getUserIdByLoginName(pool, LoginName)
         
         areaCode = request.areaCode
@@ -97,34 +133,3 @@ def validateSubscribeRequest(request: SubscribeRequest, pool):
                     subStartTime = queryfield.queryValue[0]
                     subEndTime = queryfield.queryValue[1]
         return userId, areaCode, wkt, isWKT, nodeNames, cloudPercent, subStartTime, subEndTime 
-
-def subscribe_blueprint(app: Flask, siwa: SiwaDoc) -> Blueprint:
-    subscribe = Blueprint("subscribe", __name__)
-    
-    @siwa.doc(
-        description="订阅功能接口",   
-        body=SubscribeRequest
-    )
-    @subscribe.route("/agrsQueryModuleSpatial/sendSubscribeRequest", methods=["POST"])
-    def subscribeService():
-        json_data = request.get_json()
-        query = SubscribeRequest(**json_data)
-        
-        pool = create_pool()
-        userId, areaCode, wkt, isWKT, nodeNames, cloudPercent, subStartTime, subEndTime = validateSubscribeRequest(query,pool)
-
-        subTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 时间格式转化
-        subTime = formatTime(subTime)
-        subStartTime = formatTime(subStartTime)
-        subEndTime = formatTime(subEndTime)
-        
-        # 生成订阅ID
-        subID = generateSubID(pool)
-        
-        # 插入订阅信息
-        insertSubscribe(pool, subID, userId, areaCode, wkt, isWKT, nodeNames, cloudPercent, subTime, subStartTime, subEndTime, "0")
-        return {"subID": subID}
-        
-    return subscribe

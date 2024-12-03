@@ -14,14 +14,6 @@ def rz_app():
     app = Flask(__name__,)
     CORS(app)
     siwa = SiwaDoc(app, title="FJY API", description="地质云航遥节点遥感数据服务系统接口文档")
-    MyPool = create_pool()
-    cache = SimpleCache()
-    MyCacheManager = CacheManager(cache)
-    
-    @app.before_request
-    def loadParams():
-        g.MyPool = MyPool
-        g.MyCacheManager = MyCacheManager
 
     @app.post(f"/test")
     @siwa.doc(

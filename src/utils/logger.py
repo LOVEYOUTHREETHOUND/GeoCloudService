@@ -4,7 +4,7 @@ logger = logging.getLogger("main")
 stream_handler = logging.StreamHandler()
 
 time_f_str = "%Y-%m-%d_%H-%M-%S"
-file_handler = logging.FileHandler(f"{datetime.datetime.now().strftime(time_f_str)}.log")
+file_handler = logging.FileHandler(f"{datetime.datetime.now().strftime(time_f_str)}.log", encoding="utf-8")
 
 stream_handler.setLevel(logging.INFO)
 file_handler.setLevel(logging.DEBUG)

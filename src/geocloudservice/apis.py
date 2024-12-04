@@ -19,9 +19,9 @@ from src.utils.db.oracle import create_pool, executeQuery, executeNonQuery
 
 from src.geocloudservice.blueprints.spatial_query_bp import spatial_query_blueprint
 from src.geocloudservice.blueprints.recommend_query_bp import search_query_blueprint, recommend_query_blueprint
+from src.geocloudservice.blueprints.app_get_areas import app_get_areas_api
 from src.geocloudservice.api_models import TimespanQueryModel
 from src.geocloudservice.blueprints.subscribe import subscribe_blueprint
-
 
 
 
@@ -129,7 +129,7 @@ def bp_feedback(app, siwa):
 
     app.register_blueprint(bp_feedback)
 
-#cmm20241023已完成订单统计优化
+# cmm20241023已完成订单统计优化
 def bp_stat(app, siwa):
     bp_stat = Blueprint("stat", __name__, url_prefix='/bupt_stat')
     @bp_stat.post("/get")

@@ -1,8 +1,9 @@
-from flask import request, jsonify, Blueprint
+from flask import request, jsonify, Blueprint, current_app
+import json
 
 from src.utils.db.oracle import create_pool, executeQueryAsDict
+from src.config.config import ENABLE_SM4_ENCRYPTION
 from src.utils.sm4encry import SM4Util
-
 
 def app_get_areas_api(app, siwa):
     get_areas_bp = Blueprint("get_areas", __name__, url_prefix="/mj/agrsArea")
@@ -86,12 +87,45 @@ def app_get_areas_api(app, siwa):
 
 # app端响应通用格式
 def app_response(data: dict, status_code: int = 200):
-    DECRYPT_FLAG = False  # 两个变量临时放这儿
     VERSION = "v0.1.0-bupt"
-    response = {
-        "data": data,
-        "decryptFlag": DECRYPT_FLAG,
+    response_template = {
+        "decryptFlag": ENABLE_SM4_ENCRYPTION,
         "status": status_code,
         "version": VERSION,
     }
-    return jsonify(response), status_code
+
+    try:
+        if response_template["decryptFlag"]:
+            response_template["data"] = encrypt_data(data)
+        else:
+            response_template["data"] = data
+        return jsonify(response_template), status_code
+    
+    except RuntimeError as e:
+        error_response = {
+            "error": str(e),
+            "decryptFlag": False,
+            "status": 500,
+            "version": VERSION,
+        }
+        return jsonify(error_response), 500
+    
+
+def encrypt_data(data: dict) -> str:
+    """
+    帮助函数，用于使用SM4Util加密数据。
+    返回加密后的字符串，或在加密失败时引发异常。
+
+    """
+    sm4_util: SM4Util = current_app.extensions.get('sm4_util')
+    if sm4_util is None:
+        raise RuntimeError("SM4模块未初始化")
+    
+    try:
+        serialized_data = json.dumps(data, ensure_ascii=False)
+        encrypted =sm4_util.encrypt_ecb_base64(serialized_data)
+        if encrypted is None:
+            raise RuntimeError("加密失败")
+        return encrypted
+    except Exception as e:
+        raise RuntimeError(f"加密数据失败：{e}")

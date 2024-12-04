@@ -187,13 +187,13 @@ def bp_stat(app, siwa):
             # cursor = connection.cursor()
             # cursor.execute("SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0, 2, 5) AND F_CREATTIME BETWEEN TIMESTAMP '2024-01-01 00:00:00' AND TIMESTAMP '2024-09-28 23:59:59'")
             # user = cursor.fetchone()
-            selectSql = "SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0, 2, 5) AND \
+            selectSql = "SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0) AND \
                 F_CREATTIME BETWEEN TIMESTAMP '2024-01-01 00:00:00' AND TIMESTAMP '2024-09-28 23:59:59'"
             user = executeQuery(g.MyPool, selectSql)
             print(f"连接成功，当前用户: {user[0]}")  # 打印当前用户以验证连接
 
             # 使用参数化查询，确保日期格式正确
-            query1 = "SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS=6 AND F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') \
+            query1 = "SELECT COUNT(*) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0) AND F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') \
                 AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND F_GET_METHOD = :F_GET_METHOD"
             
             #离线订单数量offline_order_num
@@ -209,7 +209,7 @@ def bp_stat(app, siwa):
                                              {'start_time': start_time, 'end_time' : end_time, 'F_GET_METHOD': '在线下载'})[0]
 
             #离线订单数据量offline_order_size
-            query2="SELECT F_DATA_SUM FROM TF_ORDER WHERE F_STATUS=6 AND F_CREATTIME \
+            query2="SELECT F_DATA_SUM FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0) AND F_CREATTIME \
                 BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND F_GET_METHOD = :F_GET_METHOD"
             # cursor.execute(query2, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')
             # print(cursor.fetchone())
@@ -237,7 +237,7 @@ def bp_stat(app, siwa):
             # 打印总和
             # print("离线订单总数据量：", total_sum)
             logger.info(f"离线订单总数据量：{total_sum}")
-            offline_order_size = round(total_sum, 0)
+            offline_order_size = round(total_sum/1024, 1)
 
             #在线订单数据量online_order_size
             # cursor.execute(query2, start_time=start_time, end_time=end_time, F_GET_METHOD='在线下载')
@@ -266,10 +266,10 @@ def bp_stat(app, siwa):
             # 打印总和
             # print("在线订单总数据量：", total_sum)
             logger.info(f"在线订单总数据量：{total_sum}")
-            online_order_size = round(total_sum, 0)
+            online_order_size = round(total_sum/1024, 1)
 
             #离线订单景数offline_order_scene_num
-            query3="SELECT SUM(F_DATACOUNT) FROM TF_ORDER WHERE F_STATUS=6 AND \
+            query3="SELECT SUM(F_DATACOUNT) FROM TF_ORDER WHERE F_STATUS NOT IN (-1, 0) AND \
                     F_CREATTIME BETWEEN TO_TIMESTAMP(:start_time, 'YYYY-MM-DD HH24:MI:SS') AND TO_TIMESTAMP(:end_time, 'YYYY-MM-DD HH24:MI:SS') AND \
                     F_GET_METHOD = :F_GET_METHOD"
             # cursor.execute(query3, start_time=start_time, end_time=end_time, F_GET_METHOD='线下拷贝')

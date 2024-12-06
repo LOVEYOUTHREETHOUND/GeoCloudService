@@ -22,8 +22,7 @@ from src.geocloudservice.blueprints.recommend_query_bp import search_query_bluep
 from src.geocloudservice.blueprints.app_get_areas import app_get_areas_api
 from src.geocloudservice.api_models import TimespanQueryModel
 from src.geocloudservice.blueprints.subscribe import subscribe_blueprint
-
-
+from src.config.config import ENABLE_SM4_ENCRYPTION
 
 def gen_app():
     app = Flask(__name__,)
@@ -34,10 +33,21 @@ def gen_app():
     cache = SimpleCache()
     MyCacheManager = CacheManager(cache)
     
+    if ENABLE_SM4_ENCRYPTION:
+        from src.utils.sm4encry import SM4Util
+        from src.config.config import SM4_KEY
+        with app.app_context():
+            sm4_util = SM4Util(key=SM4_KEY)
+            app.extensions['sm4_util'] = sm4_util
+    
     @app.before_request
     def loadParams():
         g.MyPool = MyPool
         g.MyCacheManager = MyCacheManager
+    # spatial_query_bp = spatial_query_blueprint(siwa, pool)
+    # app.register_blueprint(spatial_query_bp)
+    
+   
 
     recommend_query_bp = recommend_query_blueprint(app, siwa)
     app.register_blueprint(recommend_query_bp)

@@ -1,6 +1,8 @@
-from flask import request, jsonify, Blueprint, g
+from flask import request, jsonify, Blueprint, g, current_app
+import json
 
 from src.utils.db.oracle import create_pool, executeQueryAsDict
+from src.config.config import ENABLE_SM4_ENCRYPTION
 from src.utils.sm4encry import SM4Util
 
 
@@ -21,7 +23,7 @@ def app_get_areas_api(app, siwa):
 
         tree = get_ares_tree(code, q_type, show_wkt, show_sub, show_all_sub)
         if not tree:
-            return app_response({"error": "未找到对应的地区信息"}, 500)
+            return app_response({"error": "未找到对应的地区信息"}, 404)
         return app_response(tree)
 
     def get_ares_tree(code, q_type, show_wkt, show_sub, show_all_sub):  # 参数均未使用
@@ -38,9 +40,12 @@ def app_get_areas_api(app, siwa):
         :param data: 行政区数据列表，线性，各个元素是包含code和name字段的字典
         :return: 树形结构数据
         """
-        
+
         data = [
-            {"code": item["CODE"].removeprefix("156"), "name": item["NAME"]}  # removeprefix 需要Python 3.9
+            {
+                "code": item["CODE"].removeprefix("156"),
+                "name": item["NAME"],
+            }  # removeprefix 需要Python 3.9
             for item in data
         ]
         data.sort(key=lambda x: x["code"])
@@ -67,9 +72,9 @@ def app_get_areas_api(app, siwa):
                 prov_list.append(nodes[area_code])
             else:
                 city_code = area_code[:4] + "00"  # 获取市级节点代码
-                is_county_direct_under_prov = area_code[2:4] == "90"  # 是否为省直辖县级行政区划
+                is_county_direct = area_code[2:4] == "90"  # 是否为省直辖县级行政区划
                 is_municipality = area_code[:2] in municipalities  # 是否为直辖市
-                if area_code == city_code or is_county_direct_under_prov or is_municipality:
+                if area_code == city_code or is_county_direct or is_municipality:
                     # 市级节点
                     nodes[prov_code]["child"].append(nodes[area_code])
                 else:
@@ -86,12 +91,45 @@ def app_get_areas_api(app, siwa):
 
 # app端响应通用格式
 def app_response(data: dict, status_code: int = 200):
-    DECRYPT_FLAG = False  # 两个变量临时放这儿
     VERSION = "v0.1.0-bupt"
-    response = {
-        "data": data,
-        "decryptFlag": DECRYPT_FLAG,
+    response_template = {
+        "decryptFlag": ENABLE_SM4_ENCRYPTION,
         "status": status_code,
         "version": VERSION,
     }
-    return jsonify(response), status_code
+
+    try:
+        if response_template["decryptFlag"] and response_template["status"] == 200:
+            response_template["data"] = encrypt_data(data)
+        else:
+            response_template["data"] = data
+        return jsonify(response_template), status_code
+
+    except RuntimeError as e:
+        error_response = {
+            "error": str(e),
+            "decryptFlag": False,
+            "status": 500,
+            "version": VERSION,
+        }
+        return jsonify(error_response), 500
+
+
+def encrypt_data(data: dict) -> str:
+    """
+    帮助函数，用于使用SM4Util加密数据。
+    返回加密后的字符串，或在加密失败时引发异常。
+
+    """
+    sm4_util: SM4Util = current_app.extensions.get("sm4_util")
+    if sm4_util is None:
+        raise RuntimeError("SM4模块未初始化")
+
+    try:
+        serialized_data = json.dumps(data, ensure_ascii=False)
+        encrypted = sm4_util.encrypt_ecb_base64(serialized_data)
+        if encrypted is None:
+            raise RuntimeError("加密失败")
+        return encrypted
+    except Exception as e:
+        raise RuntimeError(f"加密数据失败：{e}")

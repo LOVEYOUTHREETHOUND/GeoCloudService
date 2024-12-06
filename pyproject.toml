@@ -18,8 +18,12 @@ dependencies = [
     "geopandas>=1.0.1",
     "flask-cors>=5.0.0",
     "marshmallow>=3.23.1",
+<<<<<<< HEAD
     "requests>=2.32.3",
     "minio>=7.2.12",
+=======
+    "gmssl @ git+https://github.com/duanhongyi/gmssl.git",
+>>>>>>> 295c550ef9265a7a1f681b991b5878b2329a81a2
 ]
 requires-python = "==3.11.*"
 readme = "README.md"

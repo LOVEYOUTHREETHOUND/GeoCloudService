@@ -292,7 +292,7 @@ def bp_stat(app, siwa):
                 "onlineOrderSize": online_order_size,
                 "offlineOrderSceneNum": offline_order_scene_num,
                 "onlineOrderSceneNum": online_order_scene_num,
-                "orderSize": offline_order_size + online_order_size  # 总数据量
+                "orderSize": round(offline_order_size + online_order_size,1)  # 总数据量
                 # "OrderSize": offline_order_size + online_order_size  # 总数据量
             }
 

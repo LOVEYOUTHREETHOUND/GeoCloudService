@@ -76,7 +76,8 @@ def fetchRecommendData(tablename: list, wkt: str, areacode: str , pool):
         return None
     dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                 "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
-                "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
+                "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH",
+                "SDO_GEOMETRY.get_wkt(F_SPATIAL_INFO)"]
     whereSql = "WHERE F_TOPLEFTLATITUDE <= :maxlat AND F_TOPLEFTLONGITUDE >= :minlon AND F_BOTTOMRIGHTLATITUDE >= :minlat AND F_BOTTOMRIGHTLONGITUDE <= :maxlon"
     selectSql = generateSqlQuery(dataname, tablename, whereSql)
     ordersql = ' ORDER BY "F_RECEIVETIME" DESC FETCH FIRST :limit_num ROWS ONLY'
@@ -134,7 +135,8 @@ def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTim
             return None
         dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                     "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
-                    "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH","F_SPATIAL_INFO"]
+                    "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH",
+                    "SDO_GEOMETRY.get_wkt(F_SPATIAL_INFO)"]
         whereSql = " WHERE  F_RECEIVETIME BETWEEN TO_DATE(:startTime, \'YYYY-MM-DD HH24:MI:SS\') AND TO_DATE(:endTime, \'YYYY-MM-DD HH24:MI:SS\') AND F_CLOUDPERCENT <= :cloudPercent"
         selectSql = generateSqlQuery(dataname, tablename, whereSql)
         orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
@@ -170,7 +172,7 @@ def querySubscribedData(tablename: list, wkt: str, areacode: str, startTime: str
         if wkt is None and areacode is None:
             logger.error('wkt和areacode不能同时为空')
             return None
-        dataname = ["F_DATANAME", "F_SPATIAL_INFO"]
+        dataname = ["F_DATANAME", "SDO_GEOMETRY.get_wkt(F_SPATIAL_INFO)"]
         whereSql = ' WHERE  F_RECEIVETIME BETWEEN TO_DATE(:startTime, \'YYYY-MM-DD HH24:MI:SS\') AND TO_DATE(:endTime, \'YYYY-MM-DD HH24:MI:SS\') AND F_CLOUDPERCENT <= :cloudPercent'
         selectSql = generateSqlQuery(dataname, tablename, whereSql)
         orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
@@ -323,8 +325,10 @@ def getShapelyAreaByCode(areacode: str, pool):
     Returns:
         shapely.geometry对象: 行政区划的几何形状
     """
-    try:    
-        sql = 'select "GEOM" from TC_DISTRICT where F_DISTCODE = :areacode'
+    try:   
+        tempSql = "ALTER TABLESPACE TEMP ADD DATAFILE 'temp02.dbf' SIZE 100M;"
+        executeNonQuery(pool, tempSql)
+        sql = 'SELECT SDO_GEOMETRY.get_wkt(GEOM) FROM TC_DISTRICT WHERE F_DISTCODE = :areacode'
         res = executeQuery(pool, sql, {'areacode': areacode})[0][0]
         geodbhandler = GeoDBHandler()
         return geodbhandler.sdoGeometryToShapely(res)
@@ -376,7 +380,7 @@ def generateSqlQuery(dataname: list, tablename: list, wheresql: str = None) -> s
         tableSqlList = []
         for table in tablename:
             table = table.upper()
-            columns = ','.join([f'"{name}"' for name in dataname])
+            columns = ','.join([f'{name}' for name in dataname])
             tableSqlList.append(f'select {columns} FROM {table} {wheresql}')
         sql = ' UNION ALL '.join(tableSqlList)
         return sql

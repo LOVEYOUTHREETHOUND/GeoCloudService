@@ -79,31 +79,16 @@ class GeoDBHandler:
         """将SDO_GEOMETRY对象转换为shapely几何对象。
         
         Args:
-        sdo_geometry: SDO_GEOMETRY对象(从数据库中直接读取);
+        sdo_geometry: SDO_GEOMETRY的CLOB对象(从数据库中直接读取);
         Returns:
         shapely几何对象;
         """
         
         if sdo_geometry is None:
             return None
-
-        # 获取SDO_GTYPE, SDO_SRID, SDO_POINT, SDO_ELEM_INFO, SDO_ORDINATES
-        sdo_gtype = sdo_geometry.SDO_GTYPE
-        sdo_ordinates = sdo_geometry.SDO_ORDINATES.aslist()
-
-        # 根据SDO_GTYPE确定几何类型
-        if sdo_gtype == 2001:  # 点
-            point = shapely.geometry.Point(sdo_ordinates)
-            return point
-        elif sdo_gtype == 2003:  # 多边形
-            polygon = shapely.geometry.Polygon(self.pairwise(sdo_ordinates))
-            return polygon
-        elif sdo_gtype == 2007: # 多点
-            multipoint = shapely.geometry.MultiPoint(self.pairwise(sdo_ordinates))
-            return multipoint
-        else:
-            logger.error(f"不支持的类型 SDO_GTYPE: {sdo_gtype}")
-            return None
+        wkt = sdo_geometry.read()
+        return shapely.wkt.loads(wkt)
+        
         
     def pairwise(self, iterable):
         """将可迭代对象两两配对;

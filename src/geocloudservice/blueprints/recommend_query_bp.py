@@ -167,7 +167,8 @@ def recommend_query_blueprint(app, siwa):
         area_code = query.areaCode
         wkt = query.wkt
         if area_code == "" and wkt == "":
-            return "请检查区域设置信息" 
+            area_code = "156000000"
+            wkt = None
         else:
             if area_code == "":
                 area_code = None
@@ -217,7 +218,8 @@ def recommend_query_blueprint(app, siwa):
         area_code = query.areaCode
         wkt = query.wkt
         if area_code == "" and wkt == "":
-            return "请检查区域设置信息" 
+            area_code = "156000000"
+            wkt = None
         else:
             if area_code == "":
                 area_code = None
@@ -279,7 +281,8 @@ def search_query_blueprint(app, siwa):
         area_code = query.areaCode  
         wkt = query.wkt
         if area_code == "" and wkt == "":
-            return "请检查区域设置信息"  
+            area_code = "156000000"
+            wkt = None  
         else:
             if area_code == "":
                 area_code = None

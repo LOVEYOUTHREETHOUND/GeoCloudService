@@ -416,7 +416,7 @@ def user_guide(app,siwa):
     def get_video_url():
         title = request.args.get('title')
         video_resources = {
-            "地质云遥感数据平台操作说明":"http://10.82.8.64:8080/satellite.pic/%E7%B3%BB%E7%BB%9F%E6%93%8D%E4%BD%9C%E6%BC%94%E7%A4%BA%E8%A7%86%E9%A2%91.mp4"
+            "地质云遥感数据平台操作说明":"https://geogf.agrs.cn/satellite.pic/%E7%B3%BB%E7%BB%9F%E6%93%8D%E4%BD%9C%E6%BC%94%E7%A4%BA%E8%A7%86%E9%A2%91.mp4"
         }
         video_url = video_resources.get(title)
         if video_url:

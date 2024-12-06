@@ -355,6 +355,7 @@ def formatDictForView(dictList: list):
 
             newDict['RN'] = index + 1
             newDict['NODENAME'] = NodeIdToNodeName[newDict['NODEID']]
+            newDict['F_CLOUDPERCENT'] = int(float(newDict['F_CLOUDPERCENT']))
             res.append(newDict)
         return res
     except Exception as e:

@@ -94,7 +94,7 @@ class QueryParam(BaseModel):
     F_PRODUCTID: int = Field(..., title="产品序列号")
     F_PRODUCTLEVEL: str = Field(..., title="产品级别")
     NODENAME: str = Field(...,title="卫星节点")
-    F_CLOUDPERCENT: str = Field(...,title="云量")
+    F_CLOUDPERCENT: int = Field(...,title="云量")
     F_TABLENAME: str = Field(..., title="表名")
     F_DATATYPENAME: str = Field(..., title="产品类型")
     F_ORBITID: int = Field(..., title="轨道号")

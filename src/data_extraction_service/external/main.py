@@ -1,22 +1,18 @@
 import schedule
-import time 
+import time
+from src.utils.db.oracle import create_pool
+from src.data_extraction_service.external.schedule.orderProcess import OrderProcess
+from src.geocloudservice.recommend import ProcessDueSubscriptions
+from src.config import config
 
-from src.data_extraction_service.external.schedule import orderProcess
-from src.utils.logger import logger
-from src.utils.db.oracle import create_pool, executeQueryAsDict
-import src.config.config as config
-import src.utils.GeoDBHandler 
-import src.utils.GeoProcessor
-from src.geocloudservice.recommend import ProcessDueSubscriptions, fetchRecommendData
+MyPool = create_pool()
+MyOrderProcess = OrderProcess(MyPool)
 
-import geopandas as gpd
-from shapely.geometry import Polygon
-from src.utils.IdMaker import getPkId
+schedule.every(config.SCHE_WRITE_ORDER_TIME).minutes.do(MyOrderProcess.writePendingOrderToRequire)
+schedule.every(config.SCHE_READ_ORDER_TIME).minutes.do(MyOrderProcess.updateOrderStatusFromRespond)
+schedule.every(config.SCHE_UPDATE_TESTORDER_TIME).days.do(MyOrderProcess.updateTestOrder)
+schedule.every(config.SCHE_PROCESS_SUB_ORDER_TIME).days.do(ProcessDueSubscriptions,MyPool)
 
-
-def main():
-    tablename = ["TB_META_ZY02C","TB_META_GF5"]
-    wkt = "POLYGON ((93.2814 58.5466, 94.2746 58.4038, 93.9459 57.8909, 92.9661 58.0319, 93.2814 58.5466))"
-    pool = create_pool()
-    print(fetchRecommendData(tablename,wkt,None,pool))
-    # ProcessDueSubscriptions(pool)
+while True:
+    schedule.run_pending()
+    time.sleep(1)

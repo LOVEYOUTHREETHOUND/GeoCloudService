@@ -206,7 +206,7 @@ def sendEmailToUser(userid: str, data: list, pool):
     subject = "地质云卫星数据服务-数据订阅"
     message = f"您好，您订阅的数据{data}已经上线【中国地质调查局自然资源航空物探遥感中心】"
     emailAddr = getUserEmail(userid)
-    # send_email(subject, message, emailAddr)
+    send_email(subject, message, emailAddr)
     logger.info(f'邮件发送成功: {message} to {emailAddr}')
 
 def updateSubOrderStatus(pool, subid: str):
@@ -223,6 +223,7 @@ def updateSubOrderStatus(pool, subid: str):
 def ProcessDueSubscriptions(pool):
     """处理过期的订阅"""
     try:
+        logger.info('正在处理过期订阅')
         dataname = ["USERID","SUBID","AREACODE","ISWKT","NODENAMES","CLOUDPERCENT",
                     "SUBTIME","SUBSTARTTIME","SUBENDTIME","WKT","STATUS"]
         tabelname = ["SUBSCRIBE_ORDER"]

@@ -7,7 +7,7 @@ from src.utils.sm4encry import SM4Util
 
 
 def app_get_areas_api(app, siwa):
-    get_areas_bp = Blueprint("get_areas", __name__, url_prefix="/mj/agrsArea")
+    get_areas_bp = Blueprint("get_areas", __name__, url_prefix="/agrsArea")
 
     # 获取所有地区树形结构接口
     @get_areas_bp.route("/get", methods=["GET"])

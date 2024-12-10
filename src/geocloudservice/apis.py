@@ -55,6 +55,8 @@ def gen_app():
     app.register_blueprint(search_query_bp)
     subscribe_blueprint_bp = subscribe_blueprint(app, siwa)
     app.register_blueprint(subscribe_blueprint_bp)
+    app_get_areas_api_bp = app_get_areas_api(app,siwa)
+    app.register_blueprint(app_get_areas_api_bp)
 
     @app.post(f"/test")
     @siwa.doc(

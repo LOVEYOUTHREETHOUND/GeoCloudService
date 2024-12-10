@@ -81,7 +81,7 @@ def generateSubID(pool) -> str:
         newestSubID = newestSubID[0][0]
         dataPart = newestSubID[:8]
         sequenctPart = int(newestSubID[10:])   
-        if currentDate != dataPart:
+        if currentDate == dataPart:
             sequenctPart = 1
         else:
             sequenctPart += 1

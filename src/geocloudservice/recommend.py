@@ -327,8 +327,6 @@ def getShapelyAreaByCode(areacode: str, pool):
         shapely.geometry对象: 行政区划的几何形状
     """
     try:   
-        tempSql = "ALTER TABLESPACE TEMP ADD DATAFILE 'temp02.dbf' SIZE 100M;"
-        executeNonQuery(pool, tempSql)
         sql = 'SELECT SDO_GEOMETRY.get_wkt(GEOM) FROM TC_DISTRICT WHERE F_DISTCODE = :areacode'
         res = executeQuery(pool, sql, {'areacode': areacode})[0][0]
         geodbhandler = GeoDBHandler()

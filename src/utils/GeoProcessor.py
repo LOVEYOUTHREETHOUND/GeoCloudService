@@ -1,5 +1,7 @@
 import geopandas as gpd
 from src.config import config
+from concurrent.futures import ThreadPoolExecutor
+from itertools import repeat
 from shapely.geometry import Point, LineString, Polygon, box
 from src.utils.logger import logger
 
@@ -25,6 +27,50 @@ class GeoProcessor:
         except Exception as e:
             logger.error(f"检查相交数据时出现错误: {e}")
             return gpd.GeoDataFrame()
+
+    def rmHighlyOverlappingData(self, geo_df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """去除高度重叠的数据;
+
+        Args:
+            geo_df (gpd.GeoDataFrame): 需过滤的GeoDataFrame数据
+
+        Returns:
+            gpd.GeoDataFrame: 过滤后的GeoDataFrame数据
+        """
+        # 计算每条数据的覆盖区域面积
+        areas = geo_df.geometry.area
+        # 初始化一个列表来存储高度重叠的数据索引
+        highly_overlapping_indices = []
+        
+        # 使用空间索引加速空间查询
+        sindex = geo_df.geometry.sindex
+
+        def check_overlap(args):
+            item, sindex, areas, geo_df = args
+            idx , geom = item
+            # 查找可能包含当前地理数据的其他地理数据的索引
+            possible_overlapping_indices = list(sindex.intersection(geom.bounds))
+            # 获取可能包含当前地理数据的其他地理数据
+            possible_overlapping_geoms = geo_df.geometry.iloc[possible_overlapping_indices]
+            # 检查当前数据是否完全被其他数据的并集包含
+            if geom.within(possible_overlapping_geoms.unary_union):
+                # 检查当前数据是否不是最大的覆盖区域
+                if geom.area < areas.max():
+                    return idx
+            return None
+        
+        # 使用多线程并行化计算
+        with ThreadPoolExecutor() as executor:
+            results = executor.map(check_overlap, zip(geo_df.geometry.items(), repeat(sindex), repeat(areas), repeat(geo_df)))
+        
+        # 收集结果
+        for result in results:
+            if result is not None:
+                highly_overlapping_indices.append(result)
+        
+        # 去除高度重叠的数据
+        filtered_geo_df = geo_df.drop(highly_overlapping_indices)
+        return filtered_geo_df
         
     def calCoverageRatio(self,target_area, data_gdf: gpd.GeoDataFrame) -> float:
         """

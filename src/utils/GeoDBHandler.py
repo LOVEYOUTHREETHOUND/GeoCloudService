@@ -31,7 +31,29 @@ class GeoDBHandler:
         attributes = []
         for row in rows:
             # 分离几何和属性
-            geometry = self.sdoGeometryToShapely(row[-1])
+            geometry = self.sdoGeometryWktToShapely(row[-1])
+            attribute = row[:-1]
+            geometries.append(geometry)
+            attributes.append(attribute)
+        
+        # 创建GeoDataFrame
+        gdf = gpd.GeoDataFrame(attributes, columns=columns, geometry=geometries, crs=self.crs)
+        return gdf
+    
+    def imageDataToGeoDataFrame(self, rows, columns) -> gpd.GeoDataFrame:
+        """将数据库查询到的遥感影像信息转化为GeoDataFrame;
+
+        rows: 数据库查询结果;
+            columns: 除几何数据外的列名;
+            默认最后一列为SDO_GEOMETRY对象;
+        Returns:
+            gpd.GeoDataFrame;
+        """
+        geometries = []
+        attributes = []
+        for row in rows:
+            # 分离几何和属性
+            geometry = self.sdoGeometryPolygonToShapely(row[-1])
             attribute = row[:-1]
             geometries.append(geometry)
             attributes.append(attribute)
@@ -54,7 +76,7 @@ class GeoDBHandler:
         try:
             geometries = []
             for data in sdo_geometry:
-                geometry = self.sdoGeometryToShapely(data)
+                geometry = self.sdoGeometryWktToShapely(data)
                 geometries.append(geometry)
                 
             if additional_columns is None and additional_data is None:
@@ -74,9 +96,8 @@ class GeoDBHandler:
             logger.error(f"将SDO_GEOMETRY对象转换为GeoDataFrame时出现错误: {e}")
             return None
             
-    
-    def sdoGeometryToShapely(self, sdo_geometry):    
-        """将SDO_GEOMETRY对象转换为shapely几何对象。
+    def sdoGeometryWktToShapely(self, sdo_geometry):
+        """将SDO_GEOMETRY对象转换成的wkt clob包转换为shapely几何对象。
         
         Args:
         sdo_geometry: SDO_GEOMETRY的CLOB对象(从数据库中直接读取);
@@ -88,6 +109,30 @@ class GeoDBHandler:
             return None
         wkt = sdo_geometry.read()
         return shapely.wkt.loads(wkt)
+    
+    def sdoGeometryPolygonToShapely(self, sdo_geometry):    
+        """将SDO_GEOMETRY对象的polygon类型对象转换为shapely几何对象。
+        
+        Args:
+        sdo_geometry: SDO_GEOMETRY的CLOB对象(从数据库中直接读取);
+        Returns:
+        shapely几何对象;
+        """
+        
+        if sdo_geometry is None:
+            return None
+
+        # 获取SDO_GTYPE, SDO_SRID, SDO_POINT, SDO_ELEM_INFO, SDO_ORDINATES
+        sdo_gtype = sdo_geometry.SDO_GTYPE
+        sdo_ordinates = sdo_geometry.SDO_ORDINATES.aslist()
+
+        # 根据SDO_GTYPE确定几何类型
+        if  sdo_gtype == 2003:  # 多边形
+            polygon = shapely.geometry.Polygon(self.pairwise(sdo_ordinates))
+            return polygon
+        else:
+            logger.error(f"不支持的类型 SDO_GTYPE: {sdo_gtype}")
+            return None
         
         
     def pairwise(self, iterable):

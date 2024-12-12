@@ -77,8 +77,10 @@ def fetchRecommendData(tablename: list, wkt: str, areacode: str , pool):
     dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                 "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                 "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH",
-                "SDO_GEOMETRY.get_wkt(F_SPATIAL_INFO)"]
-    whereSql = "WHERE F_TOPLEFTLATITUDE <= :maxlat AND F_TOPLEFTLONGITUDE >= :minlon AND F_BOTTOMRIGHTLATITUDE >= :minlat AND F_BOTTOMRIGHTLONGITUDE <= :maxlon"
+                "F_SPATIAL_INFO"]
+    whereSql = "WHERE F_TOPLEFTLATITUDE <= :maxlat AND F_TOPLEFTLONGITUDE >= :minlon \
+        AND F_BOTTOMRIGHTLATITUDE >= :minlat AND F_BOTTOMRIGHTLONGITUDE <= :maxlon \
+            AND F_CLOUDPERCENT <= 20"
     selectSql = generateSqlQuery(dataname, tablename, whereSql)
     ordersql = ' ORDER BY "F_RECEIVETIME" DESC FETCH FIRST :limit_num ROWS ONLY'
     sql = f'{selectSql} {ordersql}'
@@ -92,7 +94,7 @@ def fetchRecommendData(tablename: list, wkt: str, areacode: str , pool):
         while coverage_ratio < 0.9 and n < 9:
             limit_num = 100 * n
             data, columns = fetchDataFromDB(pool, sql, {'limit_num': limit_num, 'minlon': minlon, 'maxlon': maxlon, 'minlat': minlat, 'maxlat': maxlat})
-            data_gdf = geodbhandler.dbDataToGeoDataFrame(data, columns)
+            data_gdf = geodbhandler.imageDataToGeoDataFrame(data, columns)
             intersected_data = geoprocessor.findIntersectedData(target_area, data_gdf)
             coverage_ratio = geoprocessor.calCoverageRatio(target_area, intersected_data)
             n += 1
@@ -136,7 +138,7 @@ def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTim
         dataname = ["F_DATANAME", "F_DID", "F_SCENEROW", "F_LOCATION", "F_PRODUCTID", "F_PRODUCTLEVEL",
                     "F_CLOUDPERCENT", "F_TABLENAME", "F_DATATYPENAME", "F_ORBITID", "F_PRODUCETIME",
                     "F_SENSORID", "F_DATASIZE", "F_RECEIVETIME", "F_DATAID", "F_SATELLITEID", "F_SCENEPATH",
-                    "SDO_GEOMETRY.get_wkt(F_SPATIAL_INFO)"]
+                    "F_SPATIAL_INFO"]
         whereSql = " WHERE  F_RECEIVETIME BETWEEN TO_DATE(:startTime, \'YYYY-MM-DD HH24:MI:SS\') AND TO_DATE(:endTime, \'YYYY-MM-DD HH24:MI:SS\') AND F_CLOUDPERCENT <= :cloudPercent"
         selectSql = generateSqlQuery(dataname, tablename, whereSql)
         orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
@@ -145,7 +147,7 @@ def searchData(tablename: list, wkt :str, areacode : str, startTime: str, endTim
         target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
         geoprocessor = GeoProcessor()
         ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent})
-        ImageGdf = geodbhandler.dbDataToGeoDataFrame(ImageInfo, columns)
+        ImageGdf = geodbhandler.imageDataToGeoDataFrame(ImageInfo, columns)
         intersected_data = geoprocessor.findIntersectedData(target_area, ImageGdf)
         result = geoprocessor.GeoDataFrameToDict(intersected_data)
         formatted_result = formatDictForView(result)
@@ -172,14 +174,14 @@ def querySubscribedData(tablename: list, wkt: str, areacode: str, startTime: str
         if wkt is None and areacode is None:
             logger.error('wkt和areacode不能同时为空')
             return None
-        dataname = ["F_DATANAME", "SDO_GEOMETRY.get_wkt(F_SPATIAL_INFO)"]
+        dataname = ["F_DATANAME", "F_SPATIAL_INFO"]
         whereSql = ' WHERE  F_RECEIVETIME BETWEEN TO_DATE(:startTime, \'YYYY-MM-DD HH24:MI:SS\') AND TO_DATE(:endTime, \'YYYY-MM-DD HH24:MI:SS\') AND F_CLOUDPERCENT <= :cloudPercent'
         selectSql = generateSqlQuery(dataname, tablename, whereSql)
         orderSql = ' ORDER BY "F_RECEIVETIME" DESC '
         sql = f'{selectSql} {orderSql}'
         ImageInfo, columns = fetchDataFromDB(pool, sql, {'startTime': startTime, 'endTime': endTime, 'cloudPercent': cloudPercent})
         geodbhandler = GeoDBHandler()
-        ImageGdf = geodbhandler.dbDataToGeoDataFrame(ImageInfo, columns)
+        ImageGdf = geodbhandler.imageDataToGeoDataFrame(ImageInfo, columns)
         target_area = getTargetArea(geodbhandler, wkt, areacode, pool)
         geoprocessor = GeoProcessor()
         intersected_data = geoprocessor.findIntersectedData(target_area, ImageGdf)
@@ -330,7 +332,7 @@ def getShapelyAreaByCode(areacode: str, pool):
         sql = 'SELECT SDO_GEOMETRY.get_wkt(GEOM) FROM TC_DISTRICT WHERE F_DISTCODE = :areacode'
         res = executeQuery(pool, sql, {'areacode': areacode})[0][0]
         geodbhandler = GeoDBHandler()
-        return geodbhandler.sdoGeometryToShapely(res)
+        return geodbhandler.sdoGeometryWktToShapely(res)
     except Exception as e:
         logger.error(f'无法从areacode获取对应几何形状: {e}')
         return None 
